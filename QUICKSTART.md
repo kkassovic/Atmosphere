@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get Atmosphere up and running in 5 minutes.
+Get atmosphere up and running in 5 minutes.
 
 ## Prerequisites
 
@@ -13,15 +13,15 @@ Get Atmosphere up and running in 5 minutes.
 ### 1. Clone or Download
 
 ```bash
-git clone https://github.com/kkassovic/Atmosphere.git
-cd Atmosphere
+git clone https://github.com/kkassovic/atmosphere.git
+cd atmosphere
 ```
 
 Or download:
 ```bash
-wget https://github.com/kkassovic/Atmosphere/archive/main.zip
+wget https://github.com/kkassovic/atmosphere/archive/main.zip
 unzip main.zip
-cd Atmosphere-main
+cd atmosphere-main
 ```
 
 ### 2. Run Installer
@@ -34,7 +34,7 @@ sudo ./install/install.sh
 This will:
 - Install Docker and required tools
 - Set up Traefik reverse proxy
-- Build and install Atmosphere
+- Build and install atmosphere
 - Create systemd service
 - Configure firewall
 
@@ -60,7 +60,7 @@ sudo systemctl restart atmosphere
 
 ### 4. Verify Installation
 
-Check Atmosphere is running:
+Check atmosphere is running:
 ```bash
 sudo systemctl status atmosphere
 ```
@@ -106,7 +106,7 @@ EXPOSE 80'
 # Upload HTML
 curl -X POST http://localhost:3000/api/v1/apps/my-site/files \
   -F "path=index.html" \
-  -F 'content=<h1>Hello from Atmosphere!</h1>'
+  -F 'content=<h1>hello from atmosphere!</h1>'
 
 # Deploy
 curl -X POST http://localhost:3000/api/v1/apps/my-site/deploy

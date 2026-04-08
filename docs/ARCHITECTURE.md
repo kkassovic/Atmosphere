@@ -2,7 +2,7 @@
 
 ## Overview
 
-Atmosphere is a lightweight deployment platform built with Go, designed to deploy Docker-based applications on a single Linux server with automatic reverse proxy routing via Traefik.
+atmosphere is a lightweight deployment platform built with Go, designed to deploy Docker-based applications on a single Linux server with automatic reverse proxy routing via Traefik.
 
 ## System Components
 
