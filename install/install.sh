@@ -197,8 +197,7 @@ certificatesResolvers:
 log:
   level: INFO
 
-accessLog:
-  enabled: true
+accessLog: {}
 EOF
 
 # Create Traefik docker-compose.yml

@@ -41,5 +41,4 @@ certificatesResolvers:
 log:
   level: INFO
 
-accessLog:
-  enabled: true
+accessLog: {}
