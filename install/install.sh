@@ -292,22 +292,22 @@ if [ -n "$BACKEND_DIR" ]; then
         echo -e "${GREEN}✓ Go already installed: $(go version)${NC}"
     fi
     
-    # Build Atmosphere
+    # Build atmosphere
     echo -e "${YELLOW}Downloading Go dependencies...${NC}"
     cd "$BACKEND_DIR"
     
     # Ensure Go is in PATH
     export PATH=$PATH:/usr/local/go/bin
     
-    # Download dependencies
-    go mod download
+    # Download dependencies and generate go.sum
+    go mod tidy
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to download Go dependencies${NC}"
         exit 1
     fi
     
     # Build binary
-    echo -e "${YELLOW}Compiling Atmosphere binary...${NC}"
+    echo -e "${YELLOW}Compiling atmosphere binary...${NC}"
     go build -o $INSTALL_DIR/atmosphere ./cmd/atmosphere
     BUILD_STATUS=$?
     
