@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
@@ -89,9 +90,11 @@ func (s *DockerService) RemoveContainer(ctx context.Context, containerID string)
 // GetContainersByLabel finds containers with a specific label
 func (s *DockerService) GetContainersByLabel(ctx context.Context, labelKey, labelValue string) ([]types.Container, error) {
 	filter := fmt.Sprintf("%s=%s", labelKey, labelValue)
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("label", filter)
 	containers, err := s.client.ContainerList(ctx, container.ListOptions{
 		All:     true,
-		Filters: types.NewArgsFilter(map[string][]string{"label": {filter}}),
+		Filters: filterArgs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
@@ -139,9 +142,7 @@ func (s *DockerService) NetworkExists(ctx context.Context, networkName string) (
 
 // CreateNetwork creates a Docker network
 func (s *DockerService) CreateNetwork(ctx context.Context, networkName string) error {
-	_, err := s.client.NetworkCreate(ctx, networkName, types.NetworkCreate{
-		CheckDuplicate: true,
-	})
+	_, err := s.client.NetworkCreate(ctx, networkName, types.NetworkCreate{})
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
 	}
