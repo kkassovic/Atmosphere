@@ -255,28 +255,74 @@ fi
 if [ -n "$BACKEND_DIR" ]; then
     echo -e "${YELLOW}Building Atmosphere...${NC}"
     
-    # Check if Go is installed
+    # Install Go if not present
     if ! command -v go &> /dev/null; then
         echo -e "${YELLOW}Installing Go...${NC}"
         GO_VERSION="1.22.1"
-        wget -q https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz
+        
+        # Download Go
+        wget https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Failed to download Go${NC}"
+            exit 1
+        fi
+        
+        # Remove old Go installation
         rm -rf /usr/local/go
+        
+        # Extract new Go
         tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz
         rm go${GO_VERSION}.linux-amd64.tar.gz
+        
+        # Add to PATH
         export PATH=$PATH:/usr/local/go/bin
-        echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
+        
+        # Add to profile for future sessions
+        if ! grep -q "/usr/local/go/bin" /etc/profile; then
+            echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
+        fi
+        
+        # Verify Go installation
+        if ! /usr/local/go/bin/go version &> /dev/null; then
+            echo -e "${RED}Error: Go installation failed${NC}"
+            exit 1
+        fi
+        
+        echo -e "${GREEN}✓ Go ${GO_VERSION} installed${NC}"
+    else
+        echo -e "${GREEN}✓ Go already installed: $(go version)${NC}"
     fi
     
+    # Build Atmosphere
+    echo -e "${YELLOW}Downloading Go dependencies...${NC}"
     cd "$BACKEND_DIR"
+    
+    # Ensure Go is in PATH
+    export PATH=$PATH:/usr/local/go/bin
+    
+    # Download dependencies
     go mod download
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Failed to download Go dependencies${NC}"
+        exit 1
+    fi
+    
+    # Build binary
+    echo -e "${YELLOW}Compiling Atmosphere binary...${NC}"
     go build -o $INSTALL_DIR/atmosphere ./cmd/atmosphere
     BUILD_STATUS=$?
+    
     cd - > /dev/null
     
     if [ $BUILD_STATUS -eq 0 ]; then
+        # Make binary executable
+        chmod +x $INSTALL_DIR/atmosphere
         echo -e "${GREEN}✓ Atmosphere built successfully${NC}"
     else
         echo -e "${RED}Error: Failed to build Atmosphere${NC}"
+        echo -e "${YELLOW}Try running manually:${NC}"
+        echo -e "  cd $BACKEND_DIR"
+        echo -e "  go build -o $INSTALL_DIR/atmosphere ./cmd/atmosphere"
         exit 1
     fi
 else
