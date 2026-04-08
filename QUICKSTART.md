@@ -13,20 +13,21 @@ Get Atmosphere up and running in 5 minutes.
 ### 1. Clone or Download
 
 ```bash
-git clone https://github.com/yourusername/atmosphere.git
-cd atmosphere
+git clone https://github.com/kkassovic/Atmosphere.git
+cd Atmosphere
 ```
 
 Or download:
 ```bash
-wget https://github.com/yourusername/atmosphere/archive/main.zip
+wget https://github.com/kkassovic/Atmosphere/archive/main.zip
 unzip main.zip
-cd atmosphere-main
+cd Atmosphere-main
 ```
 
 ### 2. Run Installer
 
 ```bash
+chmod +x install/install.sh
 sudo ./install/install.sh
 ```
 

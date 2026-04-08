@@ -44,6 +44,8 @@ Or clone the repository and run:
 ```bash
 git clone https://github.com/yourusername/atmosphere.git
 cd atmosphere
+chmod +x install/install.sh
+chmod +x install/install.sh
 sudo ./install/install.sh
 ```
 

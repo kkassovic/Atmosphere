@@ -115,6 +115,7 @@ mkdir -p $INSTALL_DIR/workspaces
 mkdir -p $INSTALL_DIR/keys
 mkdir -p $INSTALL_DIR/logs
 mkdir -p $TRAEFIK_DIR
+mkdir -p $TRAEFIK_DIR/acme
 
 # Set permissions on keys directory
 chmod 700 $INSTALL_DIR/keys
@@ -197,8 +198,6 @@ EOF
 
 # Create Traefik docker-compose.yml
 cat > "$TRAEFIK_DIR/docker-compose.yml" << 'EOF'
-version: '3.8'
-
 services:
   traefik:
     image: traefik:v2.11
@@ -240,7 +239,20 @@ else
 fi
 
 # Build Atmosphere binary (if source is available)
-if [ -d "./backend" ]; then
+# Save current directory and check multiple possible locations
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+BACKEND_DIR=""
+if [ -d "$PROJECT_ROOT/backend" ]; then
+    BACKEND_DIR="$PROJECT_ROOT/backend"
+elif [ -d "./backend" ]; then
+    BACKEND_DIR="./backend"
+elif [ -d "../backend" ]; then
+    BACKEND_DIR="../backend"
+fi
+
+if [ -n "$BACKEND_DIR" ]; then
     echo -e "${YELLOW}Building Atmosphere...${NC}"
     
     # Check if Go is installed
@@ -255,12 +267,13 @@ if [ -d "./backend" ]; then
         echo 'export PATH=$PATH:/usr/local/go/bin' >> /etc/profile
     fi
     
-    cd backend
+    cd "$BACKEND_DIR"
     go mod download
     go build -o $INSTALL_DIR/atmosphere ./cmd/atmosphere
-    cd ..
+    BUILD_STATUS=$?
+    cd - > /dev/null
     
-    if [ $? -eq 0 ]; then
+    if [ $BUILD_STATUS -eq 0 ]; then
         echo -e "${GREEN}✓ Atmosphere built successfully${NC}"
     else
         echo -e "${RED}Error: Failed to build Atmosphere${NC}"
