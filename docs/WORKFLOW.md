@@ -1,6 +1,6 @@
-# Atmosphere - Complete Workflow Guide
+# atmosphere - Complete Workflow Guide
 
-This document explains how everything works together in Atmosphere.
+This document explains how everything works together in atmosphere.
 
 ## Table of Contents
 
@@ -15,9 +15,9 @@ This document explains how everything works together in Atmosphere.
 
 ## System Overview
 
-Atmosphere consists of four main components:
+atmosphere consists of four main components:
 
-1. **Atmosphere Service** (Go backend)
+1. **atmosphere Service** (Go backend)
    - REST API
    - Deployment orchestration
    - Database management
@@ -93,9 +93,9 @@ Atmosphere consists of four main components:
                  │
                  ▼
 ┌─────────────────────────────────────────────┐
-│ 7. Atmosphere Build & Installation          │
+│ 7. atmosphere Build & Installation          │
 │    - Download Go (if needed)                │
-│    - Build Atmosphere binary                │
+│    - Build atmosphere binary                │
 │    - Copy to /opt/atmosphere/               │
 └────────────────┬────────────────────────────┘
                  │
@@ -124,7 +124,7 @@ Atmosphere consists of four main components:
 
 After installation:
 - Traefik is running on ports 80, 443
-- Atmosphere API is available on port 3000
+- atmosphere API is available on port 3000
 - Ready to accept deployments
 - systemd will auto-start on boot
 
@@ -457,7 +457,7 @@ content=<h1>Hello World</h1>
 
 ### How Labels Create Routes
 
-When Atmosphere deploys a container:
+When atmosphere deploys a container:
 
 ```go
 labels := map[string]string{

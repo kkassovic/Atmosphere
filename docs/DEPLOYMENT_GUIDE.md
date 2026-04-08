@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide explains how different deployment workflows work in Atmosphere.
+This guide explains how different deployment workflows work in atmosphere.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ This guide explains how different deployment workflows work in Atmosphere.
 
 ### Overview
 
-GitHub deployment allows Atmosphere to automatically clone and deploy applications from private or public GitHub repositories using SSH deployment keys.
+GitHub deployment allows atmosphere to automatically clone and deploy applications from private or public GitHub repositories using SSH deployment keys.
 
 ### Prerequisites
 
@@ -43,11 +43,11 @@ This creates:
 2. Navigate to **Settings** → **Deploy keys**
 3. Click **Add deploy key**
 4. Paste the contents of `atmosphere_deploy.pub`
-5. Give it a name (e.g., "Atmosphere Deployment")
+5. Give it a name (e.g., "atmosphere Deployment")
 6. **Do not** check "Allow write access"
 7. Click **Add key**
 
-### Step 3: Create App in Atmosphere
+### Step 3: Create App in atmosphere
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/apps \
@@ -80,7 +80,7 @@ curl -X POST http://localhost:3000/api/v1/apps/my-github-app/deploy
 
 ### What Happens
 
-1. Atmosphere saves the deployment key to `/opt/atmosphere/keys/my-github-app.key`
+1. atmosphere saves the deployment key to `/opt/atmosphere/keys/my-github-app.key`
 2. On deploy, it clones the repository (or pulls if already cloned)
 3. Detects Dockerfile or docker-compose.yml
 4. Builds the application
@@ -95,7 +95,7 @@ To pull latest changes and redeploy:
 curl -X POST http://localhost:3000/api/v1/apps/my-github-app/deploy
 ```
 
-Atmosphere will:
+atmosphere will:
 1. `git pull` latest changes
 2. Rebuild the application
 3. Replace running containers

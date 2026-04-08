@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-# Atmosphere Installer
-# Installs Atmosphere deployment platform on Ubuntu 24.04 LTS
+# atmosphere Installer
+# Installs atmosphere deployment platform on Ubuntu 24.04 LTS
 #
 # This script:
 # - Installs Docker Engine and required tools
 # - Sets up Traefik reverse proxy
 # - Creates necessary directories and networks
-# - Installs Atmosphere as a systemd service
+# - Installs atmosphere as a systemd service
 # - Configures basic firewall rules
 #
 
@@ -26,7 +26,7 @@ DOCKER_NETWORK="atmosphere"
 TRAEFIK_NETWORK="traefik"
 
 echo -e "${GREEN}╔═══════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║   Atmosphere Platform Installer       ║${NC}"
+echo -e "${GREEN}║   atmosphere Platform Installer       ║${NC}"
 echo -e "${GREEN}╔═══════════════════════════════════════╗${NC}"
 echo ""
 
@@ -128,7 +128,7 @@ echo -e "${YELLOW}Setting up configuration...${NC}"
 # Create .env if it doesn't exist
 if [ ! -f "$INSTALL_DIR/.env" ]; then
     cat > "$INSTALL_DIR/.env" << 'EOF'
-# Atmosphere Configuration
+# atmosphere Configuration
 PORT=3000
 HOST=0.0.0.0
 DATABASE_PATH=/opt/atmosphere/atmosphere.db

@@ -34,7 +34,7 @@ atmosphere is a lightweight deployment platform built with Go, designed to deplo
                          │ Manages containers
                          │
               ┌──────────────────────┐
-              │  Atmosphere Service  │
+              │  atmosphere Service  │
               │  (Go Binary)         │
               │  - API Server        │
               │  - Deployment Logic  │
@@ -148,7 +148,7 @@ internal/
 
 ### Deployment Keys
 - Stored in `/opt/atmosphere/keys/` with 0600 permissions
-- Only accessible by root (Atmosphere runs as root for Docker access)
+- Only accessible by root (atmosphere runs as root for Docker access)
 - Never logged or returned in API responses
 
 ### Input Validation
@@ -295,7 +295,7 @@ Traefik automatically:
 
 ## Monitoring & Logs
 
-### Atmosphere Logs
+### atmosphere Logs
 ```bash
 journalctl -u atmosphere -f
 ```

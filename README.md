@@ -1,4 +1,4 @@
-# Atmosphere
+# atmosphere
 
 A lightweight, self-hosted deployment platform for Docker-based applications. Inspired by Coolify/Dokploy but simpler and focused only on Dockerfile and Docker Compose deployments.
 
@@ -34,7 +34,7 @@ A lightweight, self-hosted deployment platform for Docker-based applications. In
 
 ```bash
 # Download and run installer
-curl -fsSL https://raw.githubusercontent.com/yourusername/atmosphere/main/install/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/kkassovic/atmosphere/main/install/install.sh -o install.sh
 chmod +x install.sh
 sudo ./install.sh
 ```
@@ -42,7 +42,7 @@ sudo ./install.sh
 Or clone the repository and run:
 
 ```bash
-git clone https://github.com/yourusername/atmosphere.git
+git clone https://github.com/kkassovic/atmosphere.git
 cd atmosphere
 chmod +x install/install.sh
 chmod +x install/install.sh
@@ -53,12 +53,12 @@ The installer will:
 - Install Docker Engine and required tools
 - Set up Traefik reverse proxy
 - Create necessary directories and networks
-- Install Atmosphere as a systemd service
+- Install atmosphere as a systemd service
 - Configure firewall rules
 
 ### Post-Installation
 
-After installation, the Atmosphere service will be running on port 3000.
+After installation, the atmosphere service will be running on port 3000.
 
 ```bash
 # Check service status
@@ -207,7 +207,7 @@ EXPOSE 80"
 # 3. Upload index.html
 curl -X POST http://localhost:3000/api/v1/apps/hello-world/files \
   -F "path=index.html" \
-  -F "content=<h1>Hello from Atmosphere!</h1>"
+  -F "content=<h1>hello from atmosphere!</h1>"
 
 # 4. Deploy
 curl -X POST http://localhost:3000/api/v1/apps/hello-world/deploy
