@@ -1,0 +1,13 @@
+{
+  "name": "compose-example-app",
+  "version": "1.0.0",
+  "description": "Example Node.js app with Redis for Atmosphere",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "redis": "^4.6.7"
+  }
+}

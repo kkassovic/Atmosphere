@@ -1,0 +1,44 @@
+# Binaries
+atmosphere
+*.exe
+*.dll
+*.so
+*.dylib
+backend/atmosphere
+
+# Test binaries
+*.test
+*.out
+
+# Go workspace file
+go.work
+
+# Environment files
+.env
+.env.local
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Workspaces and runtime data
+workspaces/
+keys/
+logs/
+acme.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/

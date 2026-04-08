@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: ${ATMOSPHERE_APP:-compose-app}-web
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+    networks:
+      - ${TRAEFIK_NETWORK:-traefik}
+      - app-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik}"
+      - "traefik.http.routers.${ATMOSPHERE_APP:-compose-app}.rule=Host(`${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.${ATMOSPHERE_APP:-compose-app}.entrypoints=websecure"
+      - "traefik.http.routers.${ATMOSPHERE_APP:-compose-app}.tls=true"
+      - "traefik.http.routers.${ATMOSPHERE_APP:-compose-app}.tls.certresolver=letsencrypt"
+      - "traefik.http.services.${ATMOSPHERE_APP:-compose-app}.loadbalancer.server.port=3000"
+      - "atmosphere.app=${ATMOSPHERE_APP:-compose-app}"
+
+  redis:
+    image: redis:alpine
+    container_name: ${ATMOSPHERE_APP:-compose-app}-redis
+    restart: unless-stopped
+    networks:
+      - app-network
+    volumes:
+      - redis-data:/data
+
+networks:
+  app-network:
+    driver: bridge
+  traefik:
+    external: true
+
+volumes:
+  redis-data:
