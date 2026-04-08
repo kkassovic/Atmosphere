@@ -13,6 +13,11 @@
 
 set -e
 
+# Get absolute paths FIRST before any directory changes
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -239,25 +244,11 @@ else
 fi
 
 # Build atmosphere binary (if source is available)
-# Save current directory and check multiple possible locations
-# Get absolute path to script directory
-SCRIPT_PATH="${BASH_SOURCE[0]}"
-if [ -L "$SCRIPT_PATH" ]; then
-    SCRIPT_PATH="$(readlink -f "$SCRIPT_PATH")"
-fi
-SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" 2>/dev/null && pwd)"
-if [ -z "$SCRIPT_DIR" ]; then
-    SCRIPT_DIR="$(pwd)/install"
-fi
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-
+# Use the PROJECT_ROOT we calculated at the start
 BACKEND_DIR=""
 if [ -d "$PROJECT_ROOT/backend" ]; then
     BACKEND_DIR="$PROJECT_ROOT/backend"
-elif [ -d "./backend" ]; then
-    BACKEND_DIR="$(pwd)/backend"
-elif [ -d "../backend" ]; then
-    BACKEND_DIR="$(cd .. && pwd)/backend"
+    echo -e "${YELLOW}Found backend at: $BACKEND_DIR${NC}"
 fi
 
 if [ -n "$BACKEND_DIR" ]; then
