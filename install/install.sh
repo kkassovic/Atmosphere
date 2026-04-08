@@ -238,22 +238,30 @@ else
     exit 1
 fi
 
-# Build Atmosphere binary (if source is available)
+# Build atmosphere binary (if source is available)
 # Save current directory and check multiple possible locations
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Get absolute path to script directory
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+if [ -L "$SCRIPT_PATH" ]; then
+    SCRIPT_PATH="$(readlink -f "$SCRIPT_PATH")"
+fi
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" 2>/dev/null && pwd)"
+if [ -z "$SCRIPT_DIR" ]; then
+    SCRIPT_DIR="$(pwd)/install"
+fi
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 BACKEND_DIR=""
 if [ -d "$PROJECT_ROOT/backend" ]; then
     BACKEND_DIR="$PROJECT_ROOT/backend"
 elif [ -d "./backend" ]; then
-    BACKEND_DIR="./backend"
+    BACKEND_DIR="$(pwd)/backend"
 elif [ -d "../backend" ]; then
-    BACKEND_DIR="../backend"
+    BACKEND_DIR="$(cd .. && pwd)/backend"
 fi
 
 if [ -n "$BACKEND_DIR" ]; then
-    echo -e "${YELLOW}Building Atmosphere...${NC}"
+    echo -e "${YELLOW}Building atmosphere...${NC}"
     
     # Install Go if not present
     if ! command -v go &> /dev/null; then
@@ -317,9 +325,9 @@ if [ -n "$BACKEND_DIR" ]; then
     if [ $BUILD_STATUS -eq 0 ]; then
         # Make binary executable
         chmod +x $INSTALL_DIR/atmosphere
-        echo -e "${GREEN}✓ Atmosphere built successfully${NC}"
+        echo -e "${GREEN}✓ atmosphere built successfully${NC}"
     else
-        echo -e "${RED}Error: Failed to build Atmosphere${NC}"
+        echo -e "${RED}Error: Failed to build atmosphere${NC}"
         echo -e "${YELLOW}Try running manually:${NC}"
         echo -e "  cd $BACKEND_DIR"
         echo -e "  go build -o $INSTALL_DIR/atmosphere ./cmd/atmosphere"
@@ -334,7 +342,7 @@ fi
 echo -e "${YELLOW}Creating systemd service...${NC}"
 cat > /etc/systemd/system/atmosphere.service << EOF
 [Unit]
-Description=Atmosphere Deployment Platform
+Description=atmosphere Deployment Platform
 After=docker.service
 Requires=docker.service
 
@@ -362,9 +370,9 @@ systemctl enable atmosphere
 # Start service if binary exists
 if [ -f "$INSTALL_DIR/atmosphere" ]; then
     systemctl start atmosphere
-    echo -e "${GREEN}✓ Atmosphere service started${NC}"
+    echo -e "${GREEN}✓ atmosphere service started${NC}"
 else
-    echo -e "${YELLOW}⚠ Atmosphere binary not found, service not started${NC}"
+    echo -e "${YELLOW}⚠ atmosphere binary not found, service not started${NC}"
 fi
 
 # Configure firewall
@@ -374,7 +382,7 @@ if command -v ufw &> /dev/null; then
     ufw allow 22/tcp comment 'SSH'
     ufw allow 80/tcp comment 'HTTP'
     ufw allow 443/tcp comment 'HTTPS'
-    ufw allow 3000/tcp comment 'Atmosphere API'
+    ufw allow 3000/tcp comment 'atmosphere API'
     echo -e "${GREEN}✓ Firewall configured${NC}"
 else
     echo -e "${YELLOW}⚠ UFW not available, skipping firewall configuration${NC}"
@@ -386,7 +394,7 @@ echo -e "${GREEN}╔════════════════════
 echo -e "${GREEN}║   Installation Complete!              ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════╝${NC}"
 echo ""
-echo -e "${GREEN}Atmosphere has been installed successfully!${NC}"
+echo -e "${GREEN}atmosphere has been installed successfully!${NC}"
 echo ""
 echo -e "Installation directory: ${YELLOW}$INSTALL_DIR${NC}"
 echo -e "Traefik directory: ${YELLOW}$TRAEFIK_DIR${NC}"
@@ -410,8 +418,8 @@ echo "API will be available at: http://localhost:3000"
 echo ""
 echo -e "${GREEN}Next steps:${NC}"
 echo "1. Edit $INSTALL_DIR/.env and configure your settings"
-echo "2. Restart Atmosphere: systemctl restart atmosphere"
+echo "2. Restart atmosphere: systemctl restart atmosphere"
 echo "3. Start deploying apps!"
 echo ""
-echo -e "${YELLOW}Documentation: https://github.com/yourusername/atmosphere${NC}"
+echo -e "${YELLOW}Documentation: https://github.com/kkassovic/atmosphere${NC}"
 echo ""
