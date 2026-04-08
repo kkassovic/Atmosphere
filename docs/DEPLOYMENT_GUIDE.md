@@ -49,6 +49,8 @@ This creates:
 
 ### Step 3: Create App in atmosphere
 
+**Using default docker-compose.yml or Dockerfile:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/apps \
   -H "Content-Type: application/json" \
@@ -67,10 +69,57 @@ curl -X POST http://localhost:3000/api/v1/apps \
   }'
 ```
 
+**Using custom docker-compose file:**
+
+```bash
+curl -X POST http://localhost:3000/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-github-app",
+    "deployment_type": "github",
+    "build_type": "compose",
+    "compose_file": "docker-compose.prod.yml",
+    "github_repo": "git@github.com:username/repository.git",
+    "github_branch": "main",
+    "deployment_key": "'"$(cat ~/.ssh/atmosphere_deploy)"'",
+    "domain": "app.example.com",
+    "env_vars": {
+      "NODE_ENV": "production",
+      "DATABASE_URL": "postgresql://..."
+    }
+  }'
+```
+
+**Using custom Dockerfile:**
+
+```bash
+curl -X POST http://localhost:3000/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "my-github-app",
+    "deployment_type": "github",
+    "build_type": "dockerfile",
+    "dockerfile_path": "docker/Dockerfile.prod",
+    "github_repo": "git@github.com:username/repository.git",
+    "github_branch": "main",
+    "deployment_key": "'"$(cat ~/.ssh/atmosphere_deploy)"'",
+    "domain": "app.example.com",
+    "port": 3000,
+    "env_vars": {
+      "NODE_ENV": "production",
+      "DATABASE_URL": "postgresql://..."
+    }
+  }'
+```
+
 **Important**: 
 - Use the SSH URL format: `git@github.com:username/repo.git`
 - Include the entire private key in `deployment_key`
 - Specify the branch to deploy
+- **Optional fields:**
+  - `compose_file` - Path to custom docker-compose file (default: `docker-compose.yml`)
+  - `dockerfile_path` - Path to custom Dockerfile (default: `Dockerfile`)
+  - Paths are relative to repository root
 
 ### Step 4: Deploy
 
