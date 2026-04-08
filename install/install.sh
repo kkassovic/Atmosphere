@@ -306,9 +306,13 @@ if [ -n "$BACKEND_DIR" ]; then
         exit 1
     fi
     
-    # Build binary
+    # Install build tools for CGO (required for SQLite)
+    echo -e "${YELLOW}Installing build tools...${NC}"
+    apt-get install -y -qq build-essential
+    
+    # Build binary with CGO enabled (required for go-sqlite3)
     echo -e "${YELLOW}Compiling atmosphere binary...${NC}"
-    go build -o $INSTALL_DIR/atmosphere ./cmd/atmosphere
+    CGO_ENABLED=1 go build -o $INSTALL_DIR/atmosphere ./cmd/atmosphere
     BUILD_STATUS=$?
     
     cd - > /dev/null
