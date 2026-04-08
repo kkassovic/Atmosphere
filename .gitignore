@@ -4,7 +4,7 @@ atmosphere
 *.dll
 *.so
 *.dylib
-backend/atmosphere
+/backend/atmosphere
 
 # Test binaries
 *.test
