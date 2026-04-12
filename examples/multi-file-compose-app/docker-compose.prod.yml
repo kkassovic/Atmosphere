@@ -1,0 +1,53 @@
+# Atmosphere/Production configuration
+# Merged with docker-compose.yml when deployed
+
+services:
+  web:
+    # NO PORT MAPPINGS - Traefik handles all routing
+    
+    # Connect to Traefik network (external, created by Atmosphere)
+    networks:
+      - app-network
+      - ${TRAEFIK_NETWORK:-traefik}
+    
+    # Traefik labels for automatic HTTPS routing
+    labels:
+      # Enable Traefik
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik}"
+      
+      # Router configuration
+      - "traefik.http.routers.${ATMOSPHERE_APP}.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.entrypoints=websecure"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.tls=true"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.tls.certresolver=letsencrypt"
+      
+      # Service configuration (tell Traefik which port to use)
+      - "traefik.http.services.${ATMOSPHERE_APP}.loadbalancer.server.port=80"
+      
+      # Atmosphere tracking label
+      - "atmosphere.app=${ATMOSPHERE_APP}"
+    
+    # Production environment variables
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - LOG_LEVEL=info
+    
+    # Resource limits
+    # IMPORTANT: Adjust based on your server!
+    # For 1-CPU servers, use max 0.9
+    # For 2+ CPU servers, you can increase
+    deploy:
+      resources:
+        limits:
+          cpus: '${CONTAINER_CPU_LIMIT:-0.9}'
+          memory: ${CONTAINER_MEMORY_LIMIT:-1G}
+        reservations:
+          cpus: '${CONTAINER_CPU_RESERVATION:-0.25}'
+          memory: ${CONTAINER_MEMORY_RESERVATION:-256M}
+
+# Traefik network must be external (created by Atmosphere/Traefik)
+networks:
+  traefik:
+    external: true

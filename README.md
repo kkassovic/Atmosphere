@@ -119,8 +119,15 @@ curl -X POST http://localhost:3000/api/v1/apps \
     "domain": "app.example.com",
     "github_repo": "git@github.com:user/repo.git",
     "github_branch": "main",
-    "deployment_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----"
+    "deployment_key": "-----BEGIN OPENSSH PRIVATE KEY-----\n...\n-----END OPENSSH PRIVATE KEY-----",
+    "compose_path": "docker-compose.prod.yml"
   }'
+```
+
+**Note**: 
+- Use `compose_path` (not `compose_file`) to specify a custom docker-compose file
+- Atmosphere supports multi-file compose: will automatically use both `docker-compose.yml` (base) and your specified override file
+- If `compose_path` is not specified, defaults to `docker-compose.yml`
 ```
 
 **List Apps**
@@ -253,7 +260,7 @@ curl -X POST http://localhost:3000/api/v1/apps/my-github-app/deploy
 2. **Build**
    - For Dockerfile: `docker build -t atmosphere-{app-name} .`
    - For Compose: `docker compose build`
-   - Inject environment variables
+   - Inject environment variables (see below)
 
 3. **Deploy**
    - Stop old containers if running
@@ -266,6 +273,33 @@ curl -X POST http://localhost:3000/api/v1/apps/my-github-app/deploy
    - Traefik automatically detects containers via Docker provider
    - Routes traffic based on Host rules
    - Handles Let's Encrypt certificates automatically
+
+### Environment Variables
+
+**Injected by Atmosphere:**
+
+These variables are automatically available in your containers:
+
+- `ATMOSPHERE_APP` - Your app name (e.g., "my-app")
+- `DOMAIN` - Your configured domain (e.g., "app.example.com")
+- `TRAEFIK_NETWORK` - Traefik network name (default: "traefik")
+
+Use them in your docker-compose.yml:
+
+```yaml
+services:
+  web:
+    container_name: ${ATMOSPHERE_APP}-web
+    labels:
+      - "traefik.http.routers.${ATMOSPHERE_APP}.rule=Host(`${DOMAIN}`)"
+      - "traefik.docker.network=${TRAEFIK_NETWORK}"
+    networks:
+      - ${TRAEFIK_NETWORK}
+```
+
+**User-defined Variables:**
+
+Additional variables from your `env_vars` field are also passed to containers.
 
 ### Traefik Integration
 
@@ -313,6 +347,25 @@ After installation:
 - Input validation for app names, domains, paths
 - Path traversal prevention
 - Designed for single-server, trusted admin use
+
+## Documentation
+
+Comprehensive guides are available in the `docs/` directory:
+
+- **[Quick Start Guide](QUICKSTART.md)** - Get up and running in 5 minutes
+- **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Detailed deployment workflows and troubleshooting
+- **[Docker Compose Conversion Guide](docs/DOCKER_COMPOSE_CONVERSION_GUIDE.md)** - Convert existing apps for Atmosphere
+- **[Architecture Documentation](docs/ARCHITECTURE.md)** - System design and internals
+- **[Workflow Guide](docs/WORKFLOW.md)** - How everything works together
+- **[Updating Guide](docs/UPDATING.md)** - How to update Atmosphere to the latest version
+
+### Examples
+
+Working examples in the `examples/` directory:
+
+- **[Dockerfile App](examples/dockerfile-app/)** - Simple static site deployment
+- **[Compose App](examples/compose-app/)** - Multi-container Node.js application
+- **[Multi-File Compose App](examples/multi-file-compose-app/)** - Production-ready multi-file compose pattern
 
 ## Development
 

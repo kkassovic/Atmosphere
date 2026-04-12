@@ -225,13 +225,16 @@ services:
       - LOG_LEVEL=info
     
     # Resource limits for production
+    # IMPORTANT: Adjust CPU limits based on your server!
+    # For 1 CPU servers, use max 0.9 (Docker requires range 0.01-1.00)
+    # For 2+ CPU servers, you can use higher values
     deploy:
       resources:
         limits:
-          cpus: '${CONTAINER_CPU_LIMIT:-2.0}'
+          cpus: '${CONTAINER_CPU_LIMIT:-0.9}'  # Max 0.9 for single-CPU servers
           memory: ${CONTAINER_MEMORY_LIMIT:-1G}
         reservations:
-          cpus: '${CONTAINER_CPU_RESERVATION:-0.5}'
+          cpus: '${CONTAINER_CPU_RESERVATION:-0.25}'
           memory: ${CONTAINER_MEMORY_RESERVATION:-256M}
 
   # Redis doesn't need Traefik exposure (internal only)
@@ -395,7 +398,7 @@ docker volume prune
        "name": "myapp",
        "deployment_type": "github",
        "build_type": "compose",
-       "compose_file": "docker-compose.prod.yml",
+       "compose_path": "docker-compose.prod.yml",
        "github_repo": "git@github.com:yourusername/your-repo.git",
        "github_branch": "main",
        "deployment_key": "'"$(cat ~/.ssh/atmosphere_myapp)"'",
@@ -409,9 +412,21 @@ docker volume prune
    ```
 
 **Key points:**
-- ✅ Specify `"compose_file": "docker-compose.prod.yml"`
-- ✅ Atmosphere will use `docker-compose.yml` + `docker-compose.prod.yml`
-- ✅ Local `docker-compose.override.yml` is **ignored** (not specified)
+- ✅ Specify `"compose_path": "docker-compose.prod.yml"` (not `compose_file`)
+- ✅ Atmosphere **automatically detects** and uses both files:
+  - If `docker-compose.yml` exists: `-f docker-compose.yml -f docker-compose.prod.yml`
+  - If only override specified: uses just the override file
+- ✅ Local `docker-compose.override.yml` is **ignored** (not in repo or not specified)
+- ✅ Atmosphere injects variables: `ATMOSPHERE_APP`, `DOMAIN`, `TRAEFIK_NETWORK`
+
+**How Atmosphere's Multi-File Detection Works:**
+```
+1. You specify: "compose_path": "docker-compose.prod.yml"
+2. Atmosphere checks: Does "docker-compose.yml" exist in repo?
+   ├─ YES → Runs: docker compose -f docker-compose.yml -f docker-compose.prod.yml
+   └─ NO  → Runs: docker compose -f docker-compose.prod.yml
+3. Files are merged (override extends/replaces base)
+```
 
 ### Method 2: Manual File Upload
 
@@ -584,6 +599,53 @@ docker compose down
 docker compose up -d
 ```
 
+### Issue: "service has neither an image nor a build context specified"
+
+**Cause:** You specified an override file (e.g., `docker-compose.prod.yml`) but it's missing the base configuration.
+
+**Solution 1 - Multi-file pattern (recommended):**
+Ensure both files exist:
+- `docker-compose.yml` - Base config (build, image, etc.)
+- `docker-compose.prod.yml` - Override (just Traefik labels, networks)
+
+Atmosphere will automatically use both when you specify `compose_path: "docker-compose.prod.yml"`.
+
+**Solution 2 - Standalone file:**
+Make `docker-compose.prod.yml` a complete standalone file with all necessary config.
+
+### Issue: "range of CPUs is from 0.01 to 1.00, as there are only 1 CPUs available"
+
+**Cause:** Server has 1 CPU, but compose file specifies higher CPU limit (e.g., `cpus: '2.0'`).
+
+**Solution:**
+```yaml
+# docker-compose.prod.yml
+services:
+  web:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.9'  # Max for 1-CPU servers
+```
+
+Or use environment variable:
+```yaml
+cpus: '${CONTAINER_CPU_LIMIT:-0.9}'
+```
+
+### Issue: "Unable to obtain ACME certificate... forbidden domain example.com"
+
+**Cause:** Traefik email set to `something@example.com` (forbidden by Let's Encrypt).
+
+**Solution:**
+```bash
+# On Atmosphere server
+sudo nano /opt/traefik/traefik.yml
+# Change email to real address
+cd /opt/traefik
+docker compose restart
+```
+
 ### Issue: Atmosphere deployment fails to start
 
 1. **Check if base + prod configs merge correctly:**
@@ -597,10 +659,20 @@ docker compose up -d
    - `DOMAIN` - injected by Atmosphere
    - `TRAEFIK_NETWORK` - injected by Atmosphere
 
-3. **Check Atmosphere logs:**
+3. **Check Atmosphere deployment logs:**
    ```bash
-   # On Atmosphere server
+   # Via API
+   curl http://localhost:3000/api/v1/apps/{app-name}/logs | jq -r '.[0].log'
+   
+   # Or system logs
    sudo journalctl -u atmosphere -f
+   ```
+
+4. **Debug compose file selection:**
+   Look for DEBUG lines in deployment logs:
+   ```
+   DEBUG: app.ComposePath = 'docker-compose.prod.yml'
+   DEBUG: Using specified compose path: /opt/atmosphere/workspaces/app/docker-compose.prod.yml
    ```
 
 ### Issue: Can't access app after Atmosphere deployment
@@ -653,11 +725,183 @@ docker compose up -d
 
 ### Deployment
 - [ ] Code pushed to GitHub (if using GitHub deploy)
-- [ ] SSH key added to repository
-- [ ] Atmosphere app created with `compose_file: "docker-compose.prod.yml"`
+- [ ] SSH key generated **without passphrase**: `ssh-keygen -t ed25519 -N ""`
+- [ ] SSH key added to repository deploy keys
+- [ ] Atmosphere app created with `compose_path: "docker-compose.prod.yml"` (correct field name!)
+- [ ] CPU limits appropriate for server (max 0.9 for 1-CPU servers)
+- [ ] Traefik email configured (not @example.com)
 - [ ] App deployed successfully
 - [ ] Can access via domain
-- [ ] SSL certificate obtained
+- [ ] SSL certificate obtained (check with `curl -I https://domain`)
+- [ ] Container running: `docker ps | grep app-name`
+
+---
+
+## Best Practices & Lessons Learned
+
+### SSH Keys for GitHub Deployment
+
+**Always use passphrase-free keys** for automated deployment:
+```bash
+# Generate key without passphrase (-N "")
+ssh-keygen -t ed25519 -C "atmosphere-deploy" -f ~/.ssh/atmosphere_deploy -N ""
+```
+
+**Why:** Atmosphere cannot prompt for passphrases during automated deployments.
+
+### CPU and Memory Limits
+
+**Check your server specs first:**
+```bash
+# Check CPU count
+nproc
+
+# Check memory
+free -h
+```
+
+**Set limits appropriately:**
+- 1 CPU server: `cpus: '0.9'` (max is 1.0, leave some headroom)
+- 2 CPU server: `cpus: '1.8'`
+- 4 CPU server: `cpus: '3.5'`
+
+**Use environment variables for flexibility:**
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '${CONTAINER_CPU_LIMIT:-0.9}'
+      memory: ${CONTAINER_MEMORY_LIMIT:-1G}
+```
+
+### Traefik Configuration
+
+**Critical:** Always use a real email for Let's Encrypt:
+```yaml
+# /opt/traefik/traefik.yml
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: admin@yourdomain.com  # ❌ NOT example.com
+```
+
+**Restart Traefik after email change:**
+```bash
+cd /opt/traefik
+docker compose restart
+```
+
+### Docker Compose File Naming
+
+**Use descriptive names:**
+- ✅ `docker-compose.prod.yml` - Clear it's for production
+- ✅ `docker-compose.staging.yml` - For staging environment
+- ❌ `docker-compose.2.yml` - Not descriptive
+- ❌ `dc.yml` - Too abbreviated
+
+**Atmosphere detects common patterns:**
+- `docker-compose.production.yml`
+- `docker-compose.prod.yml`
+- `docker-compose.deploy.yml`
+
+### Environment Variable Strategy
+
+**Never hardcode in compose files:**
+```yaml
+# ❌ Bad
+environment:
+  - DB_PASSWORD=my_secret_123
+
+# ✅ Good
+environment:
+  - DB_PASSWORD=${DB_PASSWORD}
+```
+
+**Use Atmosphere's injected variables:**
+```yaml
+# These are automatically available
+labels:
+  - "traefik.http.routers.${ATMOSPHERE_APP}.rule=Host(`${DOMAIN}`)"
+  - "atmosphere.app=${ATMOSPHERE_APP}"
+```
+
+### Container Naming
+
+**Use Atmosphere variable for consistency:**
+```yaml
+services:
+  web:
+    container_name: ${ATMOSPHERE_APP:-myapp}-web
+    # Becomes: myapp-web in Atmosphere
+    # Becomes: myapp-web in local dev
+```
+
+**Why:** Makes it easier to identify containers in `docker ps`.
+
+### Network Configuration
+
+**Always define both networks in prod:**
+```yaml
+# docker-compose.prod.yml
+services:
+  web:
+    networks:
+      - app-network     # Internal communication
+      - ${TRAEFIK_NETWORK:-traefik}  # External routing
+
+networks:
+  app-network:
+    driver: bridge
+  traefik:
+    external: true  # Managed by Atmosphere/Traefik
+```
+
+**Never expose ports in prod:**
+```yaml
+# docker-compose.override.yml (local only)
+services:
+  web:
+    ports:
+      - "8080:80"  # Only for local dev
+
+# docker-compose.prod.yml (no ports!)
+services:
+  web:
+    # Traefik handles all routing
+```
+
+### Health Checks
+
+**Always include health checks:**
+```yaml
+services:
+  web:
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+```
+
+**Why:** Helps Docker and Atmosphere know when app is truly ready.
+
+### Volume Strategy
+
+**Separate data from code:**
+```yaml
+# docker-compose.yml (base)
+volumes:
+  - ./logs:/var/www/html/logs        # Logs (both envs)
+  - app-data:/var/www/html/storage   # Named volume
+
+# docker-compose.override.yml (local)
+volumes:
+  - ./:/var/www/html  # Source code (local only)
+
+# docker-compose.prod.yml
+# No source code mounts - use image
+```
 
 ---
 

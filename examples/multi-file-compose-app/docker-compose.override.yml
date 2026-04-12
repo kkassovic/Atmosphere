@@ -1,0 +1,22 @@
+# Local development configuration
+# This file is automatically loaded by Docker Compose
+# DO NOT use this in production!
+
+services:
+  web:
+    # Expose ports for local access
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    
+    # Mount source code for live reloading
+    volumes:
+      - ./src:/var/www/html/src
+      - ./public:/var/www/html/public
+    
+    # Development environment variables
+    environment:
+      - APP_ENV=development
+      - DEBUG=true
+      - LOG_LEVEL=debug
+    
+    # No resource limits in development

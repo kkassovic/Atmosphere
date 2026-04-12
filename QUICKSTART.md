@@ -53,9 +53,16 @@ sudo nano /opt/atmosphere/.env
 LETSENCRYPT_EMAIL=your-email@example.com
 ```
 
-Restart the service:
+**Also configure Traefik's email** (required for Let's Encrypt):
+```bash
+sudo nano /opt/traefik/traefik.yml
+# Change email from example.com to your real email address
+```
+
+Restart both services:
 ```bash
 sudo systemctl restart atmosphere
+cd /opt/traefik && docker compose restart
 ```
 
 ### 4. Verify Installation
@@ -262,17 +269,22 @@ grep LETSENCRYPT_EMAIL /opt/atmosphere/.env
 ## Next Steps
 
 1. **Read the docs**: See [README.md](README.md) for full API documentation
-2. **Deploy real apps**: Try the [examples](examples/)
-3. **Set up monitoring**: Check container logs regularly
-4. **Configure backups**: Backup `/opt/atmosphere/` regularly
-5. **Secure your server**: Configure firewall, SSH keys, fail2ban
+2. **Deploy real apps**: Try the [examples](examples/) - especially the [multi-file compose pattern](examples/multi-file-compose-app/)
+3. **Learn to update**: See [docs/UPDATING.md](docs/UPDATING.md) for keeping Atmosphere up to date
+4. **Set up monitoring**: Check container logs regularly
+5. **Configure backups**: Backup `/opt/atmosphere/` regularly
+6. **Secure your server**: Configure firewall, SSH keys, fail2ban
 
 ---
 
 ## Getting Help
 
-- **Documentation**: See [docs/](docs/) folder
-- **Issues**: Check logs first, then open an issue
+- **Documentation**: 
+  - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - Detailed deployment workflows
+  - [Docker Compose Conversion](docs/DOCKER_COMPOSE_CONVERSION_GUIDE.md) - Convert existing apps
+  - [Updating Guide](docs/UPDATING.md) - Keep Atmosphere up to date
+  - [Architecture](docs/ARCHITECTURE.md) - System internals
+- **Issues**: Check logs first, then open an issue on GitHub
 - **Examples**: See [examples/](examples/) for working apps
 
 ---

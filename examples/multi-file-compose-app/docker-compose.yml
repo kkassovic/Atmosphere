@@ -1,0 +1,38 @@
+# Base configuration - shared by all environments
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    
+    # Use Atmosphere variable or fallback
+    container_name: ${ATMOSPHERE_APP:-multi-file-app}-web
+    
+    restart: unless-stopped
+    
+    working_dir: /var/www/html
+    
+    # Volumes that persist in both environments
+    volumes:
+      - ./logs:/var/www/html/logs
+    
+    # Internal network (always present)
+    networks:
+      - app-network
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health.php"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    
+    # Load environment file
+    env_file:
+      - .env
+
+# Internal network for service communication
+networks:
+  app-network:
+    driver: bridge

@@ -69,7 +69,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
   }'
 ```
 
-**Using custom docker-compose file:**
+**Using custom docker-compose file (override pattern):**
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/apps \
@@ -78,7 +78,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
     "name": "my-github-app",
     "deployment_type": "github",
     "build_type": "compose",
-    "compose_file": "docker-compose.prod.yml",
+    "compose_path": "docker-compose.prod.yml",
     "github_repo": "git@github.com:username/repository.git",
     "github_branch": "main",
     "deployment_key": "'"$(cat ~/.ssh/atmosphere_deploy)"'",
@@ -88,6 +88,19 @@ curl -X POST http://localhost:3000/api/v1/apps \
       "DATABASE_URL": "postgresql://..."
     }
   }'
+```
+
+**Multi-file Compose Support:**
+When you specify `compose_path`, Atmosphere automatically:
+1. Detects if it's an override file (e.g., `docker-compose.prod.yml`)
+2. If `docker-compose.yml` exists, uses both: `-f docker-compose.yml -f docker-compose.prod.yml`
+3. Merges configurations correctly (override extends base)
+
+**Environment Variables Automatically Injected:**
+Atmosphere injects these variables during deployment:
+- `ATMOSPHERE_APP`: Your app name
+- `DOMAIN`: Your configured domain
+- `TRAEFIK_NETWORK`: Traefik network name (default: "traefik")
 ```
 
 **Using custom Dockerfile:**
@@ -114,12 +127,20 @@ curl -X POST http://localhost:3000/api/v1/apps \
 
 **Important**: 
 - Use the SSH URL format: `git@github.com:username/repo.git`
-- Include the entire private key in `deployment_key`
+- Include the entire private key in `deployment_key` (no passphrase)
 - Specify the branch to deploy
 - **Optional fields:**
-  - `compose_file` - Path to custom docker-compose file (default: `docker-compose.yml`)
+  - `compose_path` - Path to docker-compose file (default: `docker-compose.yml`)
+    - Supports multi-file: if you specify `docker-compose.prod.yml`, base `docker-compose.yml` is automatically included
   - `dockerfile_path` - Path to custom Dockerfile (default: `Dockerfile`)
   - Paths are relative to repository root
+
+**SSH Keys Best Practices:**
+- Generate keys **without passphrase** for automated deployment:
+  ```bash
+  ssh-keygen -t ed25519 -C "atmosphere-deploy" -f ~/.ssh/atmosphere_deploy -N ""
+  ```
+- Keys are stored securely in `/opt/atmosphere/keys/` with 0600 permissions
 
 ### Step 4: Deploy
 
@@ -464,6 +485,164 @@ curl -X POST http://localhost:3000/api/v1/apps/my-app/deploy
 
 ## Troubleshooting
 
+### Common Issues & Solutions
+
+#### 1. "Invalid request body" Error
+
+**Symptom:**
+```json
+{"error": "Invalid request body"}
+```
+
+**Cause:** Incorrect field names in API request.
+
+**Solution:** Use correct field names:
+- ✅ `compose_path` (not `compose_file`)
+- ✅ `dockerfile_path` (not `dockerfile`)
+- ✅ `deployment_key` (not `deploy_key` or `ssh_key`)
+
+**Example:**
+```bash
+curl -X POST http://localhost:3000/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d '{
+    "compose_path": "docker-compose.prod.yml"  # Correct!
+  }'
+```
+
+#### 2. "Permission denied (publickey)" During Git Clone
+
+**Symptom:**
+```
+git@github.com: Permission denied (publickey).
+fatal: Could not read from remote repository.
+```
+
+**Cause:** SSH key has a passphrase or isn't properly added to GitHub.
+
+**Solution:**
+Generate a new key **without passphrase**:
+```bash
+ssh-keygen -t ed25519 -C "atmosphere-deploy" -f ~/.ssh/atmosphere_deploy -N ""
+```
+
+Add **public key** (`~/.ssh/atmosphere_deploy.pub`) to GitHub:
+- Repository → Settings → Deploy keys → Add deploy key
+
+Test the key works:
+```bash
+ssh -i ~/.ssh/atmosphere_deploy -T git@github.com
+```
+
+Should output: `Hi username/repo! You've successfully authenticated...`
+
+#### 3. "service has neither an image nor a build context specified"
+
+**Symptom:**
+```
+service "web" has neither an image nor a build context specified: invalid compose project
+```
+
+**Cause:** Specified `compose_path` points to an override file without base configuration.
+
+**Solution:** Ensure both files exist:
+- `docker-compose.yml` - Base config
+- `docker-compose.prod.yml` - Override
+
+Atmosphere automatically merges them:
+```
+docker compose -f docker-compose.yml -f docker-compose.prod.yml
+```
+
+**Alternative:** Make your prod file standalone with full configuration.
+
+#### 4. "range of CPUs is from 0.01 to 1.00"
+
+**Symptom:**
+```
+Error response from daemon: range of CPUs is from 0.01 to 1.00, as there are only 1 CPUs available
+```
+
+**Cause:** Server has limited CPUs, but compose file requests more.
+
+**Solution:** 
+Adjust CPU limits in `docker-compose.prod.yml`:
+```yaml
+services:
+  web:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.9'  # Max for 1-CPU servers
+          memory: 1G
+```
+
+Check server CPU count:
+```bash
+nproc  # Returns number of CPUs
+```
+
+#### 5. Let's Encrypt "forbidden domain example.com"
+
+**Symptom:**
+```
+Unable to obtain ACME certificate... contact email has forbidden domain "example.com"
+```
+
+**Cause:** Traefik email is set to a placeholder domain.
+
+**Solution:**
+Edit Traefik config:
+```bash
+sudo nano /opt/traefik/traefik.yml
+# Change email: "admin@example.com" to real email
+```
+
+Restart Traefik:
+```bash
+cd /opt/traefik
+docker compose restart
+```
+
+Verify certificate issuance:
+```bash
+docker logs traefik | grep -i certificate
+```
+
+#### 6. Wrong Compose File Being Used
+
+**Symptom:** Deployment succeeds but wrong configuration is active (e.g., no Traefik labels).
+
+**Cause:** `compose_path` not set in database, or wrong file specified.
+
+**Debug:**
+Check deployment logs for compose file selection:
+```bash
+curl -s http://localhost:3000/api/v1/apps/my-app/logs | jq -r '.[0].log' | grep -i compose
+```
+
+Look for:
+```
+DEBUG: app.ComposePath = 'docker-compose.prod.yml'
+DEBUG: Using specified compose path: /opt/atmosphere/workspaces/my-app/docker-compose.prod.yml
+Using compose file: /opt/atmosphere/workspaces/my-app/docker-compose.prod.yml
+```
+
+**Solution:**
+Update app to use correct file:
+```bash
+curl -X PUT http://localhost:3000/api/v1/apps/my-app \
+  -H "Content-Type: application/json" \
+  -d '{"compose_path": "docker-compose.prod.yml"}'
+```
+
+Redeploy:
+```bash
+curl -X POST http://localhost:3000/api/v1/apps/my-app/deploy
+```
+
+---
+
 ### Deployment Fails
 
 **Check deployment logs**:
@@ -471,11 +650,18 @@ curl -X POST http://localhost:3000/api/v1/apps/my-app/deploy
 curl http://localhost:3000/api/v1/apps/my-app/logs
 ```
 
+Get detailed recent logs:
+```bash
+curl -s http://localhost:3000/api/v1/apps/my-app/logs | jq -r '.[0].log' | tail -50
+```
+
 **Common issues**:
 - Invalid Dockerfile syntax
 - Missing dependencies
 - Port conflicts
 - Network errors
+- SSH key authentication failure
+- CPU/memory limits exceeded
 
 ### App Not Accessible
 
