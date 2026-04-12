@@ -278,8 +278,24 @@ func (s *DeploymentService) deployCompose(ctx context.Context, app *models.App, 
 	// Set project name
 	projectName := fmt.Sprintf("atmosphere-%s", app.Name)
 
+	// Build compose file arguments
+	// If using a specific compose file (not the default), include base docker-compose.yml first
+	composeArgs := []string{"compose"}
+	baseCompose := filepath.Join(buildDir, "docker-compose.yml")
+	if composePath != baseCompose && fileExists(baseCompose) {
+		// Using override file - include base first
+		composeArgs = append(composeArgs, "-f", baseCompose, "-f", composePath)
+		logOutput.WriteString(fmt.Sprintf("[%s] Using base compose file: %s\n", time.Now().Format("15:04:05"), baseCompose))
+		logOutput.WriteString(fmt.Sprintf("[%s] Using override compose file: %s\n", time.Now().Format("15:04:05"), composePath))
+	} else {
+		// Using standalone compose file
+		composeArgs = append(composeArgs, "-f", composePath)
+	}
+	composeArgs = append(composeArgs, "-p", projectName)
+
 	// Run docker compose build
-	cmd := exec.Command("docker", "compose", "-f", composePath, "-p", projectName, "build")
+	buildArgs := append(composeArgs, "build")
+	cmd := exec.Command("docker", buildArgs...)
 	cmd.Dir = buildDir
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("ATMOSPHERE_APP=%s", app.Name),
@@ -294,7 +310,8 @@ func (s *DeploymentService) deployCompose(ctx context.Context, app *models.App, 
 
 	// Run docker compose up
 	logOutput.WriteString(fmt.Sprintf("[%s] Starting services\n", time.Now().Format("15:04:05")))
-	cmd = exec.Command("docker", "compose", "-f", composePath, "-p", projectName, "up", "-d")
+	upArgs := append(composeArgs, "up", "-d")
+	cmd = exec.Command("docker", upArgs...)
 	cmd.Dir = buildDir
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("ATMOSPHERE_APP=%s", app.Name),
@@ -402,6 +419,11 @@ func (s *DeploymentService) getWorkspaceDir(appName string) string {
 
 func (s *DeploymentService) getDeploymentKeyPath(appName string) string {
 	return filepath.Join(s.cfg.KeysDir, fmt.Sprintf("%s.key", appName))
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func (s *DeploymentService) createEnvFile(path string, envVars map[string]string) error {
