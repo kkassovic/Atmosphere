@@ -56,10 +56,13 @@ func (s *DeploymentService) Deploy(ctx context.Context, app *models.App) (string
 
 	if app.BuildType == "compose" {
 		// Prefer explicitly specified compose file path
+		logOutput.WriteString(fmt.Sprintf("[%s] DEBUG: app.ComposePath = '%s'\n", time.Now().Format("15:04:05"), app.ComposePath))
 		if app.ComposePath != "" {
 			composePath = filepath.Join(buildDir, app.ComposePath)
+			logOutput.WriteString(fmt.Sprintf("[%s] DEBUG: Using specified compose path: %s\n", time.Now().Format("15:04:05"), composePath))
 		} else {
 			composePath = s.detectComposeFile(buildDir)
+			logOutput.WriteString(fmt.Sprintf("[%s] DEBUG: Auto-detected compose path: %s\n", time.Now().Format("15:04:05"), composePath))
 		}
 		if composePath == "" {
 			return logOutput.String(), fmt.Errorf("no docker-compose file found")
