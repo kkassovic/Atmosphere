@@ -24,6 +24,7 @@ cd ~/atmosphere
 git pull origin main
 
 # 3. Rebuild binary to correct location
+cd ~/atmosphere/backend
 go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
 
 # 4. Restart service
@@ -113,6 +114,9 @@ Fast-forward
 If `go.mod` was updated, fetch new dependencies:
 
 ```bash
+# Navigate to backend directory
+cd ~/atmosphere/backend
+
 # Check if go.mod changed
 git diff HEAD@{1} go.mod
 
@@ -128,8 +132,8 @@ go mod tidy
 The service runs from `/opt/atmosphere/atmosphere` (NOT `/usr/local/bin/atmosphere`).
 
 ```bash
-# Build to correct location
-cd ~/atmosphere
+# Build to correct location (from backend directory)
+cd ~/atmosphere/backend
 go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
 
 # Verify binary was created
@@ -284,6 +288,7 @@ git log --oneline -10
 git reset --hard <previous-commit-hash>
 
 # Rebuild
+cd ~/atmosphere/backend
 go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
 
 # Restart
@@ -315,7 +320,7 @@ ls -lh /opt/atmosphere/atmosphere
 grep ExecStart /etc/systemd/system/atmosphere.service
 
 # Rebuild to correct location if needed
-cd ~/atmosphere
+cd ~/atmosphere/backend
 go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
 
 # Restart
@@ -332,7 +337,7 @@ sudo systemctl restart atmosphere
 sudo systemctl stop atmosphere
 
 # Rebuild
-cd ~/atmosphere
+cd ~/atmosphere/backend
 go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
 
 # Start service
@@ -354,6 +359,7 @@ ls /usr/local/go/bin/go
 export PATH=$PATH:/usr/local/go/bin
 
 # Then rebuild
+cd ~/atmosphere/backend
 go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
 
 # Make permanent (add to .bashrc)
@@ -481,6 +487,7 @@ cp /opt/atmosphere/atmosphere.db /opt/atmosphere/atmosphere.db.backup.$(date +%Y
 
 # Update
 git pull origin main
+cd ~/atmosphere/backend
 go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
 
 # Restart
