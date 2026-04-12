@@ -365,6 +365,10 @@ func (s *AppService) validateCreateRequest(req *models.CreateAppRequest) error {
 func (s *AppService) saveDeploymentKey(appName, key string) error {
 	keyPath := filepath.Join(s.cfg.KeysDir, fmt.Sprintf("%s.key", appName))
 
+	// Replace literal \n with actual newlines (for cases where JSON escaping is done incorrectly)
+	// This handles both properly formatted keys and keys with escaped newlines
+	key = regexp.MustCompile(`\\n`).ReplaceAllString(key, "\n")
+
 	// Write key to file with restrictive permissions
 	if err := os.WriteFile(keyPath, []byte(key), 0600); err != nil {
 		return fmt.Errorf("failed to write deployment key: %w", err)
