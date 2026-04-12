@@ -28,7 +28,8 @@ func NewHandler(appService *services.AppService) *Handler {
 func (h *Handler) CreateApp(w http.ResponseWriter, r *http.Request) {
 	var req models.CreateAppRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		fmt.Printf("Error decoding request body: %v\n", err)
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
 		return
 	}
 
