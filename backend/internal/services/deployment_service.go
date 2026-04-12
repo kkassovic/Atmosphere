@@ -276,7 +276,11 @@ func (s *DeploymentService) deployCompose(ctx context.Context, app *models.App, 
 	// Run docker compose build
 	cmd := exec.Command("docker", "compose", "-f", composePath, "-p", projectName, "build")
 	cmd.Dir = buildDir
-	cmd.Env = append(os.Environ(), fmt.Sprintf("ATMOSPHERE_APP=%s", app.Name))
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("ATMOSPHERE_APP=%s", app.Name),
+		fmt.Sprintf("TRAEFIK_NETWORK=%s", s.cfg.TraefikNetwork),
+		fmt.Sprintf("DOMAIN=%s", app.Domain),
+	)
 	output, err := cmd.CombinedOutput()
 	logOutput.Write(output)
 	if err != nil {
@@ -290,6 +294,7 @@ func (s *DeploymentService) deployCompose(ctx context.Context, app *models.App, 
 	cmd.Env = append(os.Environ(),
 		fmt.Sprintf("ATMOSPHERE_APP=%s", app.Name),
 		fmt.Sprintf("TRAEFIK_NETWORK=%s", s.cfg.TraefikNetwork),
+		fmt.Sprintf("DOMAIN=%s", app.Domain),
 	)
 	output, err = cmd.CombinedOutput()
 	logOutput.Write(output)
