@@ -116,6 +116,18 @@ func (s *DeploymentService) gitClone(repo, dest, keyPath, branch string, logOutp
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 
+	// Check if key file exists
+	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+		logOutput.WriteString(fmt.Sprintf("[%s] ERROR: SSH key file not found at %s\n", time.Now().Format("15:04:05"), keyPath))
+		return fmt.Errorf("SSH key file not found at %s", keyPath)
+	}
+	
+	// Log key file info
+	keyInfo, _ := os.Stat(keyPath)
+	if keyInfo != nil {
+		logOutput.WriteString(fmt.Sprintf("[%s] Using SSH key: %s (permissions: %s)\n", time.Now().Format("15:04:05"), keyPath, keyInfo.Mode()))
+	}
+
 	// Set up SSH command with deployment key
 	sshCmd := fmt.Sprintf("ssh -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null", keyPath)
 	
