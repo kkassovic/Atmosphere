@@ -55,9 +55,11 @@ func (s *DeploymentService) Deploy(ctx context.Context, app *models.App) (string
 	composePath := ""
 
 	if app.BuildType == "compose" {
-		composePath = s.detectComposeFile(buildDir)
-		if composePath == "" && app.ComposePath != "" {
+		// Prefer explicitly specified compose file path
+		if app.ComposePath != "" {
 			composePath = filepath.Join(buildDir, app.ComposePath)
+		} else {
+			composePath = s.detectComposeFile(buildDir)
 		}
 		if composePath == "" {
 			return logOutput.String(), fmt.Errorf("no docker-compose file found")
