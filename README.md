@@ -354,6 +354,8 @@ Comprehensive guides are available in the `docs/` directory:
 
 - **[Quick Start Guide](QUICKSTART.md)** - Get up and running in 5 minutes
 - **[Deployment Guide](docs/DEPLOYMENT_GUIDE.md)** - Detailed deployment workflows and troubleshooting
+- **[App Management Guide](docs/APP_MANAGEMENT.md)** - Day-to-day operations: deploy, monitor, start/stop, update, and troubleshoot apps
+- **[Traefik Guide](docs/TRAEFIK_GUIDE.md)** - Managing the reverse proxy: SSL certificates, logs, configuration, and troubleshooting
 - **[Docker Compose Conversion Guide](docs/DOCKER_COMPOSE_CONVERSION_GUIDE.md)** - Convert existing apps for Atmosphere
 - **[Architecture Documentation](docs/ARCHITECTURE.md)** - System design and internals
 - **[Workflow Guide](docs/WORKFLOW.md)** - How everything works together

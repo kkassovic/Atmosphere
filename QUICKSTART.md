@@ -269,17 +269,20 @@ grep LETSENCRYPT_EMAIL /opt/atmosphere/.env
 ## Next Steps
 
 1. **Read the docs**: See [README.md](README.md) for full API documentation
-2. **Deploy real apps**: Try the [examples](examples/) - especially the [multi-file compose pattern](examples/multi-file-compose-app/)
-3. **Learn to update**: See [docs/UPDATING.md](docs/UPDATING.md) for keeping Atmosphere up to date
-4. **Set up monitoring**: Check container logs regularly
-5. **Configure backups**: Backup `/opt/atmosphere/` regularly
-6. **Secure your server**: Configure firewall, SSH keys, fail2ban
+2. **Learn app management**: Check [App Management Guide](docs/APP_MANAGEMENT.md) for deploying, monitoring, and troubleshooting apps
+3. **Deploy real apps**: Try the [examples](examples/) - especially the [multi-file compose pattern](examples/multi-file-compose-app/)
+4. **Learn to update**: See [docs/UPDATING.md](docs/UPDATING.md) for keeping Atmosphere up to date
+5. **Set up monitoring**: Check container logs regularly
+6. **Configure backups**: Backup `/opt/atmosphere/` regularly
+7. **Secure your server**: Configure firewall, SSH keys, fail2ban
 
 ---
 
 ## Getting Help
 
 - **Documentation**: 
+  - [App Management Guide](docs/APP_MANAGEMENT.md) - Start, stop, deploy, monitor, and troubleshoot apps
+  - [Traefik Guide](docs/TRAEFIK_GUIDE.md) - Manage reverse proxy, SSL certificates, and routing
   - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - Detailed deployment workflows
   - [Docker Compose Conversion](docs/DOCKER_COMPOSE_CONVERSION_GUIDE.md) - Convert existing apps
   - [Updating Guide](docs/UPDATING.md) - Keep Atmosphere up to date

@@ -49,24 +49,107 @@ This creates:
 
 ### Step 3: Create App in atmosphere
 
-**Using default docker-compose.yml or Dockerfile:**
+#### Important: Handling SSH Keys in JSON
+
+SSH private keys contain newline characters that must be properly escaped when submitting via JSON. **The recommended approach is to use `jq` to handle JSON encoding automatically.**
+
+**Recommended Method (using `jq`):**
+
+```bash
+# Install jq if not already available
+apt-get update && apt-get install -y jq  # Debian/Ubuntu
+# or
+yum install -y jq  # CentOS/RHEL
+
+# Create app with properly escaped SSH key
+curl -X POST http://localhost:3000/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n \
+    --arg name "my-github-app" \
+    --arg deployment_type "github" \
+    --arg build_type "compose" \
+    --arg github_repo "git@github.com:username/repository.git" \
+    --arg github_branch "main" \
+    --arg deployment_key "$(cat ~/.ssh/atmosphere_deploy)" \
+    --arg domain "app.example.com" \
+    '{
+      name: $name,
+      deployment_type: $deployment_type,
+      build_type: $build_type,
+      github_repo: $github_repo,
+      github_branch: $github_branch,
+      deployment_key: $deployment_key,
+      domain: $domain,
+      env_vars: {
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://..."
+      }
+    }')"
+```
+
+**Alternative Method (manual escaping - NOT RECOMMENDED):**
+
+If you cannot use `jq`, you must manually escape newlines:
+
+```bash
+DEPLOYMENT_KEY=$(awk '{printf "%s\\n", $0}' ~/.ssh/atmosphere_deploy | sed 's/\\n$//')
+
+curl -X POST http://localhost:3000/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"name\": \"my-github-app\",
+    \"deployment_type\": \"github\",
+    \"build_type\": \"compose\",
+    \"github_repo\": \"git@github.com:username/repository.git\",
+    \"github_branch\": \"main\",
+    \"deployment_key\": \"$DEPLOYMENT_KEY\",
+    \"domain\": \"app.example.com\",
+    \"env_vars\": {
+      \"NODE_ENV\": \"production\",
+      \"DATABASE_URL\": \"postgresql://...\"
+    }
+  }"
+```
+
+**⚠️ Common Mistake - This Will Fail:**
+
+```bash
+# DON'T DO THIS - literal newlines break JSON
+curl -X POST http://localhost:3000/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deployment_key": "'"$(cat ~/.ssh/atmosphere_deploy)"'",  # ❌ Will fail!
+    ...
+  }'
+# Error: invalid character '\n' in string literal
+```
+
+#### Example: Using default docker-compose.yml or Dockerfile
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/apps \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "my-github-app",
-    "deployment_type": "github",
-    "build_type": "compose",
-    "github_repo": "git@github.com:username/repository.git",
-    "github_branch": "main",
-    "deployment_key": "'"$(cat ~/.ssh/atmosphere_deploy)"'",
-    "domain": "app.example.com",
-    "env_vars": {
-      "NODE_ENV": "production",
-      "DATABASE_URL": "postgresql://..."
-    }
-  }'
+  -d "$(jq -n \
+    --arg name "my-github-app" \
+    --arg deployment_type "github" \
+    --arg build_type "compose" \
+    --arg github_repo "git@github.com:username/repository.git" \
+    --arg github_branch "main" \
+    --arg deployment_key "$(cat ~/.ssh/atmosphere_deploy)" \
+    --arg domain "app.example.com" \
+    '{
+      name: $name,
+      deployment_type: $deployment_type,
+      build_type: $build_type,
+      github_repo: $github_repo,
+      github_branch: $github_branch,
+      deployment_key: $deployment_key,
+      domain: $domain,
+      env_vars: {
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://..."
+      }
+    }')"
 ```
 
 **Using custom docker-compose file (override pattern):**
@@ -74,20 +157,29 @@ curl -X POST http://localhost:3000/api/v1/apps \
 ```bash
 curl -X POST http://localhost:3000/api/v1/apps \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "my-github-app",
-    "deployment_type": "github",
-    "build_type": "compose",
-    "compose_path": "docker-compose.prod.yml",
-    "github_repo": "git@github.com:username/repository.git",
-    "github_branch": "main",
-    "deployment_key": "'"$(cat ~/.ssh/atmosphere_deploy)"'",
-    "domain": "app.example.com",
-    "env_vars": {
-      "NODE_ENV": "production",
-      "DATABASE_URL": "postgresql://..."
-    }
-  }'
+  -d "$(jq -n \
+    --arg name "my-github-app" \
+    --arg deployment_type "github" \
+    --arg build_type "compose" \
+    --arg compose_file "docker-compose.prod.yml" \
+    --arg github_repo "git@github.com:username/repository.git" \
+    --arg github_branch "main" \
+    --arg deployment_key "$(cat ~/.ssh/atmosphere_deploy)" \
+    --arg domain "app.example.com" \
+    '{
+      name: $name,
+      deployment_type: $deployment_type,
+      build_type: $build_type,
+      compose_path: $compose_file,
+      github_repo: $github_repo,
+      github_branch: $github_branch,
+      deployment_key: $deployment_key,
+      domain: $domain,
+      env_vars: {
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://..."
+      }
+    }')"
 ```
 
 **Multi-file Compose Support:**
@@ -108,21 +200,30 @@ Atmosphere injects these variables during deployment:
 ```bash
 curl -X POST http://localhost:3000/api/v1/apps \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "my-github-app",
-    "deployment_type": "github",
-    "build_type": "dockerfile",
-    "dockerfile_path": "docker/Dockerfile.prod",
-    "github_repo": "git@github.com:username/repository.git",
-    "github_branch": "main",
-    "deployment_key": "'"$(cat ~/.ssh/atmosphere_deploy)"'",
-    "domain": "app.example.com",
-    "port": 3000,
-    "env_vars": {
-      "NODE_ENV": "production",
-      "DATABASE_URL": "postgresql://..."
-    }
-  }'
+  -d "$(jq -n \
+    --arg name "my-github-app" \
+    --arg deployment_type "github" \
+    --arg build_type "dockerfile" \
+    --arg dockerfile_path "docker/Dockerfile.prod" \
+    --arg github_repo "git@github.com:username/repository.git" \
+    --arg github_branch "main" \
+    --arg deployment_key "$(cat ~/.ssh/atmosphere_deploy)" \
+    --arg domain "app.example.com" \
+    '{
+      name: $name,
+      deployment_type: $deployment_type,
+      build_type: $build_type,
+      dockerfile_path: $dockerfile_path,
+      github_repo: $github_repo,
+      github_branch: $github_branch,
+      deployment_key: $deployment_key,
+      domain: $domain,
+      port: 3000,
+      env_vars: {
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://..."
+      }
+    }')"
 ```
 
 **Important**: 
@@ -305,18 +406,27 @@ Use them in your docker-compose.yml for dynamic configuration.
 ```bash
 curl -X POST http://localhost:3000/api/v1/apps \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "fullstack-app",
-    "deployment_type": "github",
-    "build_type": "compose",
-    "github_repo": "git@github.com:user/repo.git",
-    "github_branch": "main",
-    "deployment_key": "'"$(cat ~/.ssh/deploy_key)"'",
-    "domain": "fullstack.example.com",
-    "env_vars": {
-      "DB_PASSWORD": "securepassword123"
-    }
-  }'
+  -d "$(jq -n \
+    --arg name "fullstack-app" \
+    --arg deployment_type "github" \
+    --arg build_type "compose" \
+    --arg github_repo "git@github.com:user/repo.git" \
+    --arg github_branch "main" \
+    --arg deployment_key "$(cat ~/.ssh/deploy_key)" \
+    --arg domain "fullstack.example.com" \
+    --arg db_password "securepassword123" \
+    '{
+      name: $name,
+      deployment_type: $deployment_type,
+      build_type: $build_type,
+      github_repo: $github_repo,
+      github_branch: $github_branch,
+      deployment_key: $deployment_key,
+      domain: $domain,
+      env_vars: {
+        DB_PASSWORD: $db_password
+      }
+    }')"
 ```
 
 ---
@@ -349,19 +459,27 @@ CMD ["node", "server.js"]
 ```bash
 curl -X POST http://localhost:3000/api/v1/apps \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "simple-app",
-    "deployment_type": "github",
-    "build_type": "dockerfile",
-    "github_repo": "git@github.com:user/simple-app.git",
-    "github_branch": "main",
-    "deployment_key": "'"$(cat ~/.ssh/deploy_key)"'",
-    "domain": "simple.example.com",
-    "port": 3000,
-    "env_vars": {
-      "NODE_ENV": "production"
-    }
-  }'
+  -d "$(jq -n \
+    --arg name "simple-app" \
+    --arg deployment_type "github" \
+    --arg build_type "dockerfile" \
+    --arg github_repo "git@github.com:user/simple-app.git" \
+    --arg github_branch "main" \
+    --arg deployment_key "$(cat ~/.ssh/deploy_key)" \
+    --arg domain "simple.example.com" \
+    '{
+      name: $name,
+      deployment_type: $deployment_type,
+      build_type: $build_type,
+      github_repo: $github_repo,
+      github_branch: $github_branch,
+      deployment_key: $deployment_key,
+      domain: $domain,
+      port: 3000,
+      env_vars: {
+        NODE_ENV: "production"
+      }
+    }')"
 ```
 
 ### Port Configuration
@@ -510,7 +628,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
   }'
 ```
 
-#### 2. "Permission denied (publickey)" During Git Clone
+#### 2. "Permission denied (publickey)" or "error in libcrypto" During Git Clone
 
 **Symptom:**
 ```
@@ -518,23 +636,115 @@ git@github.com: Permission denied (publickey).
 fatal: Could not read from remote repository.
 ```
 
-**Cause:** SSH key has a passphrase or isn't properly added to GitHub.
+Or:
+```
+Load key "/opt/atmosphere/keys/my-app.key": error in libcrypto
+git@github.com: Permission denied (publickey).
+```
 
-**Solution:**
-Generate a new key **without passphrase**:
+**Possible Causes:**
+1. SSH key has a passphrase
+2. SSH key wasn't properly encoded in JSON (newlines corrupted)
+3. SSH key not added to GitHub deploy keys
+4. Wrong repository access
+
+**Solution 1: Generate key without passphrase**
+
 ```bash
 ssh-keygen -t ed25519 -C "atmosphere-deploy" -f ~/.ssh/atmosphere_deploy -N ""
 ```
 
-Add **public key** (`~/.ssh/atmosphere_deploy.pub`) to GitHub:
-- Repository → Settings → Deploy keys → Add deploy key
+The `-N ""` ensures no passphrase is set.
 
-Test the key works:
+**Solution 2: Verify SSH key was saved correctly**
+
+If you see "error in libcrypto", the key file is likely corrupted. This usually happens when the SSH key wasn't properly JSON-encoded during app creation.
+
+First, verify the key manually:
 ```bash
+# Test the original key works
 ssh -i ~/.ssh/atmosphere_deploy -T git@github.com
+# Should output: "Hi username/repo! You've successfully authenticated..."
+
+# Compare the saved key with the original
+diff ~/.ssh/atmosphere_deploy /opt/atmosphere/keys/my-app.key
 ```
 
-Should output: `Hi username/repo! You've successfully authenticated...`
+If they differ:
+```bash
+# Manually copy the working key
+cp ~/.ssh/atmosphere_deploy /opt/atmosphere/keys/my-app.key
+chmod 600 /opt/atmosphere/keys/my-app.key
+
+# Test it works
+ssh -i /opt/atmosphere/keys/my-app.key -T git@github.com
+
+# Deploy again
+curl -X POST http://localhost:3000/api/v1/apps/my-app/deploy
+```
+
+**Solution 3: Recreate the app with proper JSON encoding**
+
+If the key is corrupted, delete and recreate the app using `jq` for proper encoding:
+
+```bash
+# Delete the app
+curl -X DELETE http://localhost:3000/api/v1/apps/my-app
+
+# Recreate with jq (handles JSON escaping automatically)
+curl -X POST http://localhost:3000/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n \
+    --arg name "my-app" \
+    --arg deployment_type "github" \
+    --arg build_type "compose" \
+    --arg github_repo "git@github.com:username/repository.git" \
+    --arg github_branch "main" \
+    --arg deployment_key "$(cat ~/.ssh/atmosphere_deploy)" \
+    --arg domain "app.example.com" \
+    '{
+      name: $name,
+      deployment_type: $deployment_type,
+      build_type: $build_type,
+      github_repo: $github_repo,
+      github_branch: $github_branch,
+      deployment_key: $deployment_key,
+      domain: $domain,
+      env_vars: {
+        NODE_ENV: "production"
+      }
+    }')"
+```
+
+**Solution 4: Verify GitHub deploy key is added**
+
+Add **public key** (`~/.ssh/atmosphere_deploy.pub`) to GitHub:
+1. Go to your repository on GitHub
+2. Navigate to **Settings** → **Deploy keys**
+3. Click **Add deploy key**
+4. Paste the contents of the **public key** file
+5. Save (don't check "Allow write access")
+
+**Verification Steps:**
+
+```bash
+# 1. Check key file exists and has correct permissions
+ls -l /opt/atmosphere/keys/my-app.key
+# Should show: -rw------- (permissions 600)
+
+# 2. View key header
+head -n 1 /opt/atmosphere/keys/my-app.key
+# Should show: -----BEGIN OPENSSH PRIVATE KEY----- (or similar)
+
+# 3. View key footer
+tail -n 1 /opt/atmosphere/keys/my-app.key
+# Should show: -----END OPENSSH PRIVATE KEY----- (or similar)
+
+# 4. Test SSH authentication
+ssh -i /opt/atmosphere/keys/my-app.key -T git@github.com
+# Success: "Hi username/repo! You've successfully authenticated..."
+# Failure: "Permission denied" or "error in libcrypto"
+```
 
 #### 3. "service has neither an image nor a build context specified"
 
@@ -751,3 +961,80 @@ df -h
 ```bash
 docker system prune -a
 ```
+
+---
+
+## Quick Reference: SSH Keys & JSON
+
+### ✅ Correct: Using jq (Recommended)
+
+```bash
+curl -X POST http://localhost:3000/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n \
+    --arg deployment_key "$(cat ~/.ssh/deploy_key)" \
+    '{ deployment_key: $deployment_key, ... }')"
+```
+
+**Why this works:** `jq` automatically escapes newlines and special characters for JSON.
+
+### ❌ Incorrect: Direct substitution
+
+```bash
+# DON'T DO THIS
+curl -X POST http://localhost:3000/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deployment_key": "'"$(cat ~/.ssh/deploy_key)"'"  # ❌ Breaks JSON!
+  }'
+# Error: invalid character '\n' in string literal
+```
+
+**Why this fails:** The SSH key contains literal newlines which break JSON syntax.
+
+### SSH Key Troubleshooting Checklist
+
+1. **Generate key without passphrase:**
+   ```bash
+   ssh-keygen -t ed25519 -C "atmosphere" -f ~/.ssh/deploy_key -N ""
+   ```
+
+2. **Add PUBLIC key to GitHub:**
+   - Copy: `cat ~/.ssh/deploy_key.pub`
+   - GitHub → Repository Settings → Deploy keys → Add deploy key
+   - Paste public key (not private key!)
+   - Don't check "Allow write access"
+
+3. **Test SSH authentication:**
+   ```bash
+   ssh -i ~/.ssh/deploy_key -T git@github.com
+   # Expected: "Hi username/repo! You've successfully authenticated..."
+   ```
+
+4. **Verify saved key (after app creation):**
+   ```bash
+   # Check permissions
+   ls -l /opt/atmosphere/keys/my-app.key  # Should be -rw-------
+   
+   # Compare with original
+   diff ~/.ssh/deploy_key /opt/atmosphere/keys/my-app.key
+   
+   # If different, manually copy
+   cp ~/.ssh/deploy_key /opt/atmosphere/keys/my-app.key
+   chmod 600 /opt/atmosphere/keys/my-app.key
+   ```
+
+5. **Test deployment:**
+   ```bash
+   curl -X POST http://localhost:3000/api/v1/apps/my-app/deploy
+   curl http://localhost:3000/api/v1/apps/my-app/logs  # Check for errors
+   ```
+
+### Common Error Messages
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `invalid character '\n' in string literal` | SSH key not JSON-escaped | Use `jq` method |
+| `Load key "...": error in libcrypto` | Corrupted key file | Manually copy key file |
+| `Permission denied (publickey)` | Key not added to GitHub or has passphrase | Add public key to GitHub, regenerate without passphrase |
+| `git clone failed: exit status 128` | SSH authentication failed | Test with `ssh -T git@github.com` |
