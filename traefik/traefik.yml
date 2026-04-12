@@ -32,7 +32,7 @@ providers:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: admin@example.com
+      email: karol_kassovic@yahoo.com
       storage: /acme/acme.json
       httpChallenge:
         entryPoint: web
