@@ -61,7 +61,7 @@ func (s *DeploymentService) Deploy(ctx context.Context, app *models.App) (string
 			composePath = filepath.Join(buildDir, app.ComposePath)
 			logOutput.WriteString(fmt.Sprintf("[%s] DEBUG: Using specified compose path: %s\n", time.Now().Format("15:04:05"), composePath))
 		} else {
-			composePath = s.detectComposeFile(buildDir)
+			composePath = s.DetectComposeFile(buildDir)
 			logOutput.WriteString(fmt.Sprintf("[%s] DEBUG: Auto-detected compose path: %s\n", time.Now().Format("15:04:05"), composePath))
 		}
 		if composePath == "" {
@@ -194,8 +194,8 @@ func (s *DeploymentService) gitPull(repoDir, keyPath, branch string, logOutput *
 	return nil
 }
 
-// detectComposeFile detects the compose file in a directory
-func (s *DeploymentService) detectComposeFile(dir string) string {
+// DetectComposeFile detects the compose file in a directory
+func (s *DeploymentService) DetectComposeFile(dir string) string {
 	composeFiles := []string{
 		"docker-compose.yml",
 		"docker-compose.yaml",
@@ -440,6 +440,18 @@ func (s *DeploymentService) createEnvFile(path string, envVars map[string]string
 	}
 
 	return nil
+}
+
+// CreateComposeCommand creates a docker compose command with environment variables
+func (s *DeploymentService) CreateComposeCommand(ctx context.Context, workDir string, args []string, app *models.App) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd.Dir = workDir
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("ATMOSPHERE_APP=%s", app.Name),
+		fmt.Sprintf("TRAEFIK_NETWORK=%s", s.cfg.TraefikNetwork),
+		fmt.Sprintf("DOMAIN=%s", app.Domain),
+	)
+	return cmd
 }
 
 // createTarArchive creates a tar archive from a directory

@@ -453,3 +453,152 @@ func isPathWithin(targetPath, basePath string) bool {
 	}
 	return !filepath.IsAbs(rel) && !filepath.HasPrefix(rel, "..")
 }
+
+// ListFiles lists all files in an app's workspace
+func (s *AppService) ListFiles(name string) ([]models.FileInfo, error) {
+	app, err := s.GetApp(name)
+	if err != nil {
+		return nil, err
+	}
+
+	workspaceDir := filepath.Join(s.cfg.WorkspacesDir, app.Name)
+
+	// Check if workspace directory exists
+	if _, err := os.Stat(workspaceDir); os.IsNotExist(err) {
+		return []models.FileInfo{}, nil
+	}
+
+	var files []models.FileInfo
+	err = filepath.Walk(workspaceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directories and the workspace root
+		if info.IsDir() || path == workspaceDir {
+			return nil
+		}
+
+		// Get relative path
+		relPath, err := filepath.Rel(workspaceDir, path)
+		if err != nil {
+			return err
+		}
+
+		// Convert to forward slashes for consistency
+		relPath = filepath.ToSlash(relPath)
+
+		files = append(files, models.FileInfo{
+			Path:    relPath,
+			Size:    info.Size(),
+			ModTime: info.ModTime(),
+			IsDir:   info.IsDir(),
+		})
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to list files: %w", err)
+	}
+
+	return files, nil
+}
+
+// GetFile retrieves the content of a specific file from an app's workspace
+func (s *AppService) GetFile(name, filePath string) ([]byte, error) {
+	app, err := s.GetApp(name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate file path
+	if !isValidFilePath(filePath) {
+		return nil, fmt.Errorf("invalid file path")
+	}
+
+	workspaceDir := filepath.Join(s.cfg.WorkspacesDir, app.Name)
+	fullPath := filepath.Join(workspaceDir, filepath.Clean(filePath))
+
+	// Ensure the path is within the workspace
+	if !isPathWithin(fullPath, workspaceDir) {
+		return nil, fmt.Errorf("file path outside workspace")
+	}
+
+	// Check if file exists
+	info, err := os.Stat(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("file not found")
+		}
+		return nil, fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	// Don't allow reading directories
+	if info.IsDir() {
+		return nil, fmt.Errorf("path is a directory, not a file")
+	}
+
+	// Read file
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	return content, nil
+}
+
+// GetMergedComposeConfig retrieves the merged Docker Compose configuration for an app
+func (s *AppService) GetMergedComposeConfig(name string) (string, error) {
+	app, err := s.GetApp(name)
+	if err != nil {
+		return "", err
+	}
+
+	// Only works for compose-based apps
+	if app.BuildType != "compose" {
+		return "", fmt.Errorf("app is not using docker-compose (build_type: %s)", app.BuildType)
+	}
+
+	workspaceDir := filepath.Join(s.cfg.WorkspacesDir, app.Name)
+
+	// Check if workspace directory exists
+	if _, err := os.Stat(workspaceDir); os.IsNotExist(err) {
+		return "", fmt.Errorf("workspace directory not found (app may not be deployed yet)")
+	}
+
+	// Detect compose file
+	composePath := s.deploymentService.DetectComposeFile(workspaceDir)
+	if composePath == "" {
+		return "", fmt.Errorf("no docker-compose file found in workspace")
+	}
+
+	// Build compose file arguments similar to how deployment works
+	ctx := context.Background()
+	projectName := fmt.Sprintf("atmosphere-%s", app.Name)
+	composeArgs := []string{"compose"}
+
+	baseCompose := filepath.Join(workspaceDir, "docker-compose.yml")
+	if composePath != baseCompose && fileExists(baseCompose) {
+		// Using override file - include base first
+		composeArgs = append(composeArgs, "-f", baseCompose, "-f", composePath)
+	} else {
+		// Using standalone compose file
+		composeArgs = append(composeArgs, "-f", composePath)
+	}
+	composeArgs = append(composeArgs, "-p", projectName, "config")
+
+	// Run docker compose config
+	cmd := s.deploymentService.CreateComposeCommand(ctx, workspaceDir, composeArgs, app)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to get compose config: %w\nOutput: %s", err, string(output))
+	}
+
+	return string(output), nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}

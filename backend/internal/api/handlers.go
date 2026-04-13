@@ -213,6 +213,61 @@ func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ListFiles handles GET /api/v1/apps/{name}/files
+func (h *Handler) ListFiles(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	files, err := h.appService.ListFiles(name)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, files)
+}
+
+// GetFile handles GET /api/v1/apps/{name}/files/{filePath}
+func (h *Handler) GetFile(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	filePath := chi.URLParam(r, "*") // Capture everything after /files/
+
+	if filePath == "" {
+		respondError(w, http.StatusBadRequest, "file path is required")
+		return
+	}
+
+	content, err := h.appService.GetFile(name, filePath)
+	if err != nil {
+		if err.Error() == "file not found" {
+			respondError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Return the file content as plain text
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	w.Write(content)
+}
+
+// GetMergedComposeConfig handles GET /api/v1/apps/{name}/compose-config
+func (h *Handler) GetMergedComposeConfig(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	config, err := h.appService.GetMergedComposeConfig(name)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Return as plain text YAML
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(config))
+}
+
 // Helper functions for responses
 
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {

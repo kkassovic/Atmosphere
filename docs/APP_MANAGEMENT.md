@@ -13,8 +13,9 @@ This guide covers day-to-day operations for managing applications in Atmosphere,
 7. [Deleting Apps](#deleting-apps)
 8. [Testing Apps](#testing-apps)
 9. [Viewing Logs](#viewing-logs)
-10. [Common Workflows](#common-workflows)
-11. [Troubleshooting](#troubleshooting)
+10. [Viewing Files and Compose Configuration](#viewing-files-and-compose-configuration)
+11. [Common Workflows](#common-workflows)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -681,6 +682,153 @@ docker compose logs db
 docker logs atmosphere-my-app 2>&1 | grep -i error
 docker logs atmosphere-my-app 2>&1 | grep -i warning
 ```
+
+---
+
+## Viewing Files and Compose Configuration
+
+### List Files in Workspace
+
+List all files in an app's workspace directory:
+
+```bash
+curl http://localhost:3000/api/v1/apps/my-app/files
+```
+
+**Response:**
+```json
+[
+  {
+    "path": "docker-compose.yml",
+    "size": 1024,
+    "mod_time": "2026-04-12T15:30:00Z",
+    "is_dir": false
+  },
+  {
+    "path": "docker-compose.prod.yml",
+    "size": 512,
+    "mod_time": "2026-04-12T15:30:00Z",
+    "is_dir": false
+  },
+  {
+    "path": "Dockerfile",
+    "size": 256,
+    "mod_time": "2026-04-12T15:30:00Z",
+    "is_dir": false
+  },
+  {
+    "path": "src/index.js",
+    "size": 4096,
+    "mod_time": "2026-04-12T15:30:00Z",
+    "is_dir": false
+  }
+]
+```
+
+### Get Specific File Content
+
+Retrieve the content of a specific file:
+
+```bash
+curl http://localhost:3000/api/v1/apps/my-app/files/docker-compose.yml
+```
+
+**Response:**
+```yaml
+services:
+  web:
+    build: .
+    container_name: ${ATMOSPHERE_APP}
+    ...
+```
+
+### View Multiple Compose Files
+
+Get the base compose file:
+
+```bash
+curl http://localhost:3000/api/v1/apps/my-app/files/docker-compose.yml
+```
+
+Get the production override file:
+
+```bash
+curl http://localhost:3000/api/v1/apps/my-app/files/docker-compose.prod.yml
+```
+
+### Get Merged Compose Configuration
+
+See the final merged Docker Compose configuration (what Docker actually uses):
+
+```bash
+curl http://localhost:3000/api/v1/apps/my-app/compose-config
+```
+
+**Response:**
+```yaml
+name: atmosphere-my-app
+services:
+  web:
+    build:
+      context: /var/lib/atmosphere/workspaces/my-app
+      dockerfile: Dockerfile
+    container_name: atmosphere-my-app
+    environment:
+      ATMOSPHERE_APP: my-app
+      DOMAIN: app.example.com
+      NODE_ENV: production
+    labels:
+      traefik.docker.network: traefik
+      traefik.enable: "true"
+      traefik.http.routers.my-app.entrypoints: websecure
+      traefik.http.routers.my-app.rule: Host(`app.example.com`)
+      traefik.http.routers.my-app.tls.certresolver: letsencrypt
+      traefik.http.services.my-app.loadbalancer.server.port: "3000"
+    networks:
+      traefik: null
+    restart: unless-stopped
+networks:
+  traefik:
+    external: true
+    name: traefik
+```
+
+This is especially useful when:
+- Debugging compose file issues
+- Understanding how override files merge
+- Verifying Traefik labels are correct
+- Checking environment variable interpolation
+
+### Use Cases
+
+**Debug deployment issues:**
+```bash
+# Check if compose file exists
+curl -s http://localhost:3000/api/v1/apps/my-app/files | jq -r '.[] | select(.path | contains("compose")) | .path'
+
+# View merged config to see what's actually being deployed
+curl http://localhost:3000/api/v1/apps/my-app/compose-config > merged-config.yml
+```
+
+**Compare local vs deployed files:**
+```bash
+# Download deployed file
+curl http://localhost:3000/api/v1/apps/my-app/files/docker-compose.prod.yml > deployed.yml
+
+# Compare with local
+diff docker-compose.prod.yml deployed.yml
+```
+
+**Verify Traefik configuration:**
+```bash
+# Extract Traefik labels from merged config
+curl -s http://localhost:3000/api/v1/apps/my-app/compose-config | grep -A 10 "labels:"
+```
+
+**Only works for:**
+- ✅ Compose-based apps (`build_type: "compose"`)
+- ✅ Apps that have been deployed at least once
+- ❌ Not available for Dockerfile-only apps
 
 ---
 

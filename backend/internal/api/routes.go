@@ -70,6 +70,13 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 		// File upload (manual deployments)
 		r.Post("/apps/{name}/files", handler.UploadFile)
+		
+		// File operations
+		r.Get("/apps/{name}/files", handler.ListFiles)
+		r.Get("/apps/{name}/files/*", handler.GetFile)
+		
+		// Compose config
+		r.Get("/apps/{name}/compose-config", handler.GetMergedComposeConfig)
 	})
 
 	return r

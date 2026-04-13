@@ -100,3 +100,11 @@ type UploadFileRequest struct {
 	Path    string `json:"path"`
 	Content []byte `json:"content"`
 }
+
+// FileInfo represents information about a file in an app's workspace
+type FileInfo struct {
+	Path    string    `json:"path"`
+	Size    int64     `json:"size"`
+	ModTime time.Time `json:"mod_time"`
+	IsDir   bool      `json:"is_dir"`
+}
