@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 // DeploymentService handles deployment operations
@@ -446,11 +448,46 @@ func (s *DeploymentService) createEnvFile(path string, envVars map[string]string
 func (s *DeploymentService) CreateComposeCommand(ctx context.Context, workDir string, args []string, app *models.App) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Dir = workDir
-	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("ATMOSPHERE_APP=%s", app.Name),
-		fmt.Sprintf("TRAEFIK_NETWORK=%s", s.cfg.TraefikNetwork),
-		fmt.Sprintf("DOMAIN=%s", app.Domain),
-	)
+	
+	// Build environment map to handle precedence correctly
+	// Precedence (lowest to highest): container.env < .env < Atmosphere variables
+	envMap := make(map[string]string)
+	
+	// Start with system environment
+	for _, e := range os.Environ() {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+	
+	// Load environment variables from env files (Docker Compose standard precedence)
+	// Load container.env first (lower priority)
+	if containerEnv, err := godotenv.Read(filepath.Join(workDir, "container.env")); err == nil {
+		for key, value := range containerEnv {
+			envMap[key] = value
+		}
+	}
+	
+	// Load .env second (higher priority - matches Docker Compose behavior)
+	if dotEnv, err := godotenv.Read(filepath.Join(workDir, ".env")); err == nil {
+		for key, value := range dotEnv {
+			envMap[key] = value
+		}
+	}
+	
+	// Add Atmosphere-specific variables (highest priority)
+	envMap["ATMOSPHERE_APP"] = app.Name
+	envMap["TRAEFIK_NETWORK"] = s.cfg.TraefikNetwork
+	envMap["DOMAIN"] = app.Domain
+	
+	// Convert map to environment array
+	env := make([]string, 0, len(envMap))
+	for key, value := range envMap {
+		env = append(env, fmt.Sprintf("%s=%s", key, value))
+	}
+	
+	cmd.Env = env
 	return cmd
 }
 
