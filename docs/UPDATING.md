@@ -521,6 +521,61 @@ sudo crontab -e
 
 ---
 
+## Recent Improvements
+
+### April 13, 2026 - Improved SSH Key Handling
+
+**What Changed:**
+- Enhanced SSH deployment key processing to handle various escape sequences (`\n`, `\\n`)
+- Added automatic validation of SSH key format (checks for "BEGIN" and "PRIVATE KEY" markers)
+- Improved error messages when SSH keys are invalid
+- Automatic newline normalization for SSH keys
+
+**Why This Matters:**
+Previously, users had to manually copy SSH keys to `/opt/atmosphere/keys/` if they weren't properly JSON-encoded during app creation. The improved handling should eliminate the need for manual key copying.
+
+**Action Required:**
+To get this improvement, update Atmosphere:
+
+```bash
+cd ~/atmosphere
+git pull origin main
+cd backend
+go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
+sudo systemctl restart atmosphere
+```
+
+**Testing the Fix:**
+After updating, create a new app with an SSH deployment key using `jq`:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n \
+    --arg deployment_key "$(cat ~/.ssh/your_deploy_key)" \
+    --arg name "test-app" \
+    '{
+      name: $name,
+      deployment_type: "github",
+      build_type: "compose",
+      github_repo: "git@github.com:username/repo.git",
+      github_branch: "main",
+      deployment_key: $deployment_key,
+      domain: "test.example.com"
+    }')"
+```
+
+Then verify the key was saved correctly:
+```bash
+# Check if key is valid
+ssh -i /opt/atmosphere/keys/test-app.key -T git@github.com
+# Should output: "Hi username/repo! You've successfully authenticated..."
+```
+
+If authentication succeeds without manual copying, the fix is working correctly!
+
+---
+
 ## Getting Help
 
 If you encounter issues during updates:
@@ -529,11 +584,11 @@ If you encounter issues during updates:
 2. **Read release notes**: Check GitHub releases for breaking changes
 3. **Ask for help**: Open an issue on GitHub with:
    - Your Atmosphere version
-   - Update steps you followed
+   - Update steps youfollowed
    - Error messages from logs
    - Output of `systemctl status atmosphere`
 
 ---
 
-**Last Updated:** April 12, 2026  
+**Last Updated:** April 13, 2026  
 **Atmosphere Version:** 1.0

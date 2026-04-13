@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -365,16 +366,57 @@ func (s *AppService) validateCreateRequest(req *models.CreateAppRequest) error {
 func (s *AppService) saveDeploymentKey(appName, key string) error {
 	keyPath := filepath.Join(s.cfg.KeysDir, fmt.Sprintf("%s.key", appName))
 
-	// Replace literal \n with actual newlines (for cases where JSON escaping is done incorrectly)
-	// This handles both properly formatted keys and keys with escaped newlines
-	key = regexp.MustCompile(`\\n`).ReplaceAllString(key, "\n")
+	// Normalize the SSH key format
+	// Handle various escape sequences that might appear in JSON
+	
+	// First, replace escaped newlines with actual newlines
+	// Handle both single-escaped (\n) and double-escaped (\\n) newlines
+	key = regexp.MustCompile(`\\+n`).ReplaceAllStringFunc(key, func(match string) string {
+		// Count backslashes
+		backslashes := len(match) - 1
+		// If odd number of backslashes, it's an escaped newline
+		if backslashes%2 == 1 {
+			return "\n"
+		}
+		// If even, it's escaped backslashes followed by 'n'
+		return match
+	})
+
+	// Trim any extra whitespace
+	key = strings.TrimSpace(key)
+
+	// Validate the key looks like an SSH private key
+	if !strings.Contains(key, "BEGIN") || !strings.Contains(key, "PRIVATE KEY") {
+		return fmt.Errorf("deployment key does not appear to be a valid SSH private key (should contain 'BEGIN' and 'PRIVATE KEY')")
+	}
+
+	// Ensure key ends with a newline (SSH keys should)
+	if !strings.HasSuffix(key, "\n") {
+		key = key + "\n"
+	}
 
 	// Write key to file with restrictive permissions
 	if err := os.WriteFile(keyPath, []byte(key), 0600); err != nil {
 		return fmt.Errorf("failed to write deployment key: %w", err)
 	}
 
+	// Log the key format for debugging (don't log actual content)
+	lines := strings.Split(key, "\n")
+	fmt.Printf("Saved deployment key for %s: %d lines, starts with '%s', ends with '%s'\n",
+		appName,
+		len(lines),
+		truncateString(lines[0], 30),
+		truncateString(lines[len(lines)-2], 30)) // -2 because last line is empty
+
 	return nil
+}
+
+// truncateString truncates a string to maxLen characters
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 // Validation helpers
