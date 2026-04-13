@@ -297,13 +297,7 @@ func (s *DeploymentService) deployCompose(ctx context.Context, app *models.App, 
 
 	// Run docker compose build
 	buildArgs := append(composeArgs, "build")
-	cmd := exec.Command("docker", buildArgs...)
-	cmd.Dir = buildDir
-	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("ATMOSPHERE_APP=%s", app.Name),
-		fmt.Sprintf("TRAEFIK_NETWORK=%s", s.cfg.TraefikNetwork),
-		fmt.Sprintf("DOMAIN=%s", app.Domain),
-	)
+	cmd := s.CreateComposeCommand(ctx, buildDir, buildArgs, app)
 	output, err := cmd.CombinedOutput()
 	logOutput.Write(output)
 	if err != nil {
@@ -313,13 +307,7 @@ func (s *DeploymentService) deployCompose(ctx context.Context, app *models.App, 
 	// Run docker compose up
 	logOutput.WriteString(fmt.Sprintf("[%s] Starting services\n", time.Now().Format("15:04:05")))
 	upArgs := append(composeArgs, "up", "-d")
-	cmd = exec.Command("docker", upArgs...)
-	cmd.Dir = buildDir
-	cmd.Env = append(os.Environ(),
-		fmt.Sprintf("ATMOSPHERE_APP=%s", app.Name),
-		fmt.Sprintf("TRAEFIK_NETWORK=%s", s.cfg.TraefikNetwork),
-		fmt.Sprintf("DOMAIN=%s", app.Domain),
-	)
+	cmd = s.CreateComposeCommand(ctx, buildDir, upArgs, app)
 	output, err = cmd.CombinedOutput()
 	logOutput.Write(output)
 	if err != nil {
