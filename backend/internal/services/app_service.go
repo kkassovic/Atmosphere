@@ -567,10 +567,19 @@ func (s *AppService) GetMergedComposeConfig(name string) (string, error) {
 		return "", fmt.Errorf("workspace directory not found (app may not be deployed yet)")
 	}
 
-	// Detect compose file
-	composePath := s.deploymentService.DetectComposeFile(workspaceDir)
-	if composePath == "" {
-		return "", fmt.Errorf("no docker-compose file found in workspace")
+	// Use app's compose_path if specified, otherwise auto-detect
+	var composePath string
+	if app.ComposePath != "" {
+		composePath = filepath.Join(workspaceDir, app.ComposePath)
+		// Verify the specified file exists
+		if _, err := os.Stat(composePath); os.IsNotExist(err) {
+			return "", fmt.Errorf("specified compose file not found: %s", app.ComposePath)
+		}
+	} else {
+		composePath = s.deploymentService.DetectComposeFile(workspaceDir)
+		if composePath == "" {
+			return "", fmt.Errorf("no docker-compose file found in workspace")
+		}
 	}
 
 	// Build compose file arguments similar to how deployment works
