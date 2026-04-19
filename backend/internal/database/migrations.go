@@ -14,7 +14,7 @@ func RunMigrations(db *sql.DB) error {
 	}
 
 	for i, migration := range migrations {
-		if err := db.Exec(migration); err != nil {
+		if _, err := db.Exec(migration); err != nil {
 			return fmt.Errorf("migration %d failed: %w", i+1, err)
 		}
 	}
