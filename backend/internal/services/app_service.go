@@ -70,7 +70,7 @@ func (s *AppService) CreateApp(req *models.CreateAppRequest) (*models.App, error
 		DeploymentType: req.DeploymentType,
 		BuildType:      req.BuildType,
 		Status:         "stopped",
-		Domain:         req.Domain,
+		Domains:        req.Domains,
 		EnvVars:        req.EnvVars,
 		GitHubRepo:     req.GitHubRepo,
 		GitHubBranch:   req.GitHubBranch,
@@ -82,6 +82,9 @@ func (s *AppService) CreateApp(req *models.CreateAppRequest) (*models.App, error
 
 	if app.EnvVars == nil {
 		app.EnvVars = make(models.EnvVars)
+	}
+	if app.Domains == nil {
+		app.Domains = []string{}
 	}
 
 	// Save to database
@@ -121,8 +124,8 @@ func (s *AppService) UpdateApp(name string, req *models.UpdateAppRequest) (*mode
 	}
 
 	// Update fields if provided
-	if req.Domain != nil {
-		app.Domain = *req.Domain
+	if req.Domains != nil {
+		app.Domains = *req.Domains
 	}
 	if req.EnvVars != nil {
 		app.EnvVars = *req.EnvVars
@@ -356,8 +359,12 @@ func (s *AppService) validateCreateRequest(req *models.CreateAppRequest) error {
 	}
 
 	// Validate domain format if provided
-	if req.Domain != "" && !isValidDomain(req.Domain) {
-		return fmt.Errorf("invalid domain format")
+	if len(req.Domains) > 0 {
+		for _, domain := range req.Domains {
+			if domain != "" && !isValidDomain(domain) {
+				return fmt.Errorf("invalid domain format: %s", domain)
+			}
+		}
 	}
 
 	return nil

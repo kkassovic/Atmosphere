@@ -8,6 +8,7 @@ A lightweight, self-hosted deployment platform for Docker-based applications. In
 - 📦 Deploy apps by uploading files manually
 - 🔄 Automatic reverse proxy with Traefik
 - 🔒 HTTPS support with Let's Encrypt
+- 🌐 **Multiple HTTPS domains per app** - Route multiple domains to the same application
 - 🐳 Support for Dockerfile and Docker Compose based apps
 - 🔧 Simple REST API for management
 - 📊 Deployment logs and status tracking
@@ -150,7 +151,7 @@ curl -X POST http://localhost:3000/api/v1/apps/my-app/deploy
 curl -X PUT http://localhost:3000/api/v1/apps/my-app \
   -H "Content-Type: application/json" \
   -d '{
-    "domain": "newdomain.example.com",
+    "domains": ["newdomain.example.com", "www.newdomain.com"],
     "env_vars": {
       "NODE_ENV": "production",
       "API_KEY": "secret"
@@ -202,7 +203,7 @@ curl http://localhost:3000/api/v1/apps/my-app/logs
 # 1. Create app
 curl -X POST http://localhost:3000/api/v1/apps \
   -H "Content-Type: application/json" \
-  -d '{"name": "hello-world", "deployment_type": "manual", "build_type": "dockerfile", "domain": "hello.example.com"}'
+  -d '{"name": "hello-world", "deployment_type": "manual", "build_type": "dockerfile", "domains": ["hello.example.com"]}'
 
 # 2. Upload Dockerfile
 curl -X POST http://localhost:3000/api/v1/apps/hello-world/files \
@@ -237,7 +238,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
     "github_repo": "git@github.com:myorg/myrepo.git",
     "github_branch": "main",
     "deployment_key": "'"$(cat ~/.ssh/deploy_key)"'",
-    "domain": "myapp.example.com",
+    "domains": ["myapp.example.com", "www.myapp.com"],
     "env_vars": {
       "DATABASE_URL": "postgresql://..."
     }
@@ -281,7 +282,8 @@ curl -X POST http://localhost:3000/api/v1/apps/my-github-app/deploy
 These variables are automatically available in your containers:
 
 - `ATMOSPHERE_APP` - Your app name (e.g., "my-app")
-- `DOMAIN` - Your configured domain (e.g., "app.example.com")
+- `DOMAIN` - Your first configured domain (e.g., "app.example.com") - for backward compatibility
+- `DOMAINS` - Comma-separated list of all domains (e.g., "app.example.com,www.app.com,app.org")
 - `TRAEFIK_NETWORK` - Traefik network name (default: "traefik")
 
 Use them in your docker-compose.yml:

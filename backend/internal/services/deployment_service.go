@@ -247,7 +247,7 @@ func (s *DeploymentService) deployDockerfile(ctx context.Context, app *models.Ap
 		imageName,
 		app.EnvVars,
 		app.Name,
-		app.Domain,
+		app.Domains,
 		port,
 		networks,
 	)
@@ -467,7 +467,20 @@ func (s *DeploymentService) CreateComposeCommand(ctx context.Context, workDir st
 	// Add Atmosphere-specific variables (highest priority)
 	envMap["ATMOSPHERE_APP"] = app.Name
 	envMap["TRAEFIK_NETWORK"] = s.cfg.TraefikNetwork
-	envMap["DOMAIN"] = app.Domain
+	// Set DOMAIN to first domain for backward compatibility, DOMAINS as comma-separated list
+	if len(app.Domains) > 0 {
+		envMap["DOMAIN"] = app.Domains[0]
+		envMap["DOMAINS"] = ""
+		for i, domain := range app.Domains {
+			if i > 0 {
+				envMap["DOMAINS"] += ","
+			}
+			envMap["DOMAINS"] += domain
+		}
+	} else {
+		envMap["DOMAIN"] = ""
+		envMap["DOMAINS"] = ""
+	}
 	
 	// Convert map to environment array
 	env := make([]string, 0, len(envMap))

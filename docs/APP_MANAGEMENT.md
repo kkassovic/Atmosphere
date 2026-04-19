@@ -38,7 +38,7 @@ curl http://localhost:3000/api/v1/apps
     "deployment_type": "github",
     "build_type": "compose",
     "status": "running",
-    "domain": "app.example.com",
+    "domains": ["app.example.com", "www.myapp.com"],
     "github_repo": "git@github.com:user/repo.git",
     "github_branch": "main",
     "port": 3000,
@@ -52,7 +52,7 @@ curl http://localhost:3000/api/v1/apps
     "deployment_type": "manual",
     "build_type": "dockerfile",
     "status": "stopped",
-    "domain": "another.example.com",
+    "domains": ["another.example.com"],
     "created_at": "2026-04-10T08:00:00Z",
     "updated_at": "2026-04-10T08:00:00Z"
   }
@@ -110,7 +110,7 @@ curl http://localhost:3000/api/v1/apps/my-app
   "deployment_type": "github",
   "build_type": "compose",
   "status": "running",
-  "domain": "app.example.com",
+  "domains": ["app.example.com", "www.myapp.com"],
   "env_vars": {
     "NODE_ENV": "production",
     "DATABASE_URL": "postgresql://..."
@@ -127,10 +127,22 @@ curl http://localhost:3000/api/v1/apps/my-app
 
 ### Extract Specific Fields
 
-Get just the domain:
+Get the domains:
 
 ```bash
-curl -s http://localhost:3000/api/v1/apps/my-app | jq -r '.domain'
+curl -s http://localhost:3000/api/v1/apps/my-app | jq -r '.domains[]'
+```
+
+**Output:**
+```
+app.example.com
+www.myapp.com
+```
+
+Get the first domain:
+
+```bash
+curl -s http://localhost:3000/api/v1/apps/my-app | jq -r '.domains[0]'
 ```
 
 Get deployment information:
@@ -352,13 +364,13 @@ curl -X POST http://localhost:3000/api/v1/apps/my-app/start
 
 ### Update App Configuration
 
-Update app settings (domain, environment variables, etc.):
+Update app settings (domains, environment variables, etc.):
 
 ```bash
 curl -X PUT http://localhost:3000/api/v1/apps/my-app \
   -H "Content-Type: application/json" \
   -d '{
-    "domain": "newdomain.example.com",
+    "domains": ["newdomain.example.com", "www.newdomain.com"],
     "env_vars": {
       "NODE_ENV": "production",
       "NEW_VAR": "new_value"
@@ -371,7 +383,7 @@ curl -X PUT http://localhost:3000/api/v1/apps/my-app \
 {
   "id": 1,
   "name": "my-app",
-  "domain": "newdomain.example.com",
+  "domains": ["newdomain.example.com", "www.newdomain.com"],
   "env_vars": {
     "NODE_ENV": "production",
     "NEW_VAR": "new_value"
@@ -383,7 +395,7 @@ curl -X PUT http://localhost:3000/api/v1/apps/my-app \
 ### What Can Be Updated
 
 You can update these fields:
-- `domain` - App domain name
+- `domains` - App domain names (array) (**replaces all**)
 - `env_vars` - Environment variables (**replaces all**)
 - `github_branch` - GitHub branch to deploy from
 - `github_subdir` - Subdirectory in repo

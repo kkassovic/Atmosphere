@@ -13,7 +13,7 @@ type App struct {
 	DeploymentType string            `json:"deployment_type"` // "github" or "manual"
 	BuildType      string            `json:"build_type"`      // "dockerfile" or "compose"
 	Status         string            `json:"status"`          // "stopped", "running", "building", "failed"
-	Domain         string            `json:"domain,omitempty"`
+	Domains        Domains           `json:"domains,omitempty"`
 	EnvVars        EnvVars           `json:"env_vars,omitempty"`
 	GitHubRepo     string            `json:"github_repo,omitempty"`
 	GitHubBranch   string            `json:"github_branch,omitempty"`
@@ -68,31 +68,63 @@ func (e EnvVars) Value() (driver.Value, error) {
 	return json.Marshal(e)
 }
 
+// Domains is a custom type for domain list stored as JSON
+type Domains []string
+
+// Scan implements sql.Scanner for Domains
+func (d *Domains) Scan(value interface{}) error {
+	if value == nil {
+		*d = []string{}
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		*d = []string{}
+		return nil
+	}
+
+	if len(bytes) == 0 {
+		*d = []string{}
+		return nil
+	}
+
+	return json.Unmarshal(bytes, d)
+}
+
+// Value implements driver.Valuer for Domains
+func (d Domains) Value() (driver.Value, error) {
+	if d == nil {
+		return "[]", nil
+	}
+	return json.Marshal(d)
+}
+
 // CreateAppRequest represents the request to create a new app
 type CreateAppRequest struct {
-	Name           string  `json:"name"`
-	DeploymentType string  `json:"deployment_type"` // "github" or "manual"
-	BuildType      string  `json:"build_type"`      // "dockerfile" or "compose"
-	Domain         string  `json:"domain,omitempty"`
-	EnvVars        EnvVars `json:"env_vars,omitempty"`
-	GitHubRepo     string  `json:"github_repo,omitempty"`
-	GitHubBranch   string  `json:"github_branch,omitempty"`
-	GitHubSubdir   string  `json:"github_subdir,omitempty"`
-	DeploymentKey  string  `json:"deployment_key,omitempty"` // SSH private key for GitHub
-	DockerfilePath string  `json:"dockerfile_path,omitempty"`
-	ComposePath    string  `json:"compose_path,omitempty"`
-	Port           int     `json:"port,omitempty"`
+	Name           string   `json:"name"`
+	DeploymentType string   `json:"deployment_type"` // "github" or "manual"
+	BuildType      string   `json:"build_type"`      // "dockerfile" or "compose"
+	Domains        []string `json:"domains,omitempty"`
+	EnvVars        EnvVars  `json:"env_vars,omitempty"`
+	GitHubRepo     string   `json:"github_repo,omitempty"`
+	GitHubBranch   string   `json:"github_branch,omitempty"`
+	GitHubSubdir   string   `json:"github_subdir,omitempty"`
+	DeploymentKey  string   `json:"deployment_key,omitempty"` // SSH private key for GitHub
+	DockerfilePath string   `json:"dockerfile_path,omitempty"`
+	ComposePath    string   `json:"compose_path,omitempty"`
+	Port           int      `json:"port,omitempty"`
 }
 
 // UpdateAppRequest represents the request to update an app
 type UpdateAppRequest struct {
-	Domain         *string  `json:"domain,omitempty"`
-	EnvVars        *EnvVars `json:"env_vars,omitempty"`
-	GitHubBranch   *string  `json:"github_branch,omitempty"`
-	GitHubSubdir   *string  `json:"github_subdir,omitempty"`
-	DockerfilePath *string  `json:"dockerfile_path,omitempty"`
-	ComposePath    *string  `json:"compose_path,omitempty"`
-	Port           *int     `json:"port,omitempty"`
+	Domains        *[]string `json:"domains,omitempty"`
+	EnvVars        *EnvVars  `json:"env_vars,omitempty"`
+	GitHubBranch   *string   `json:"github_branch,omitempty"`
+	GitHubSubdir   *string   `json:"github_subdir,omitempty"`
+	DockerfilePath *string   `json:"dockerfile_path,omitempty"`
+	ComposePath    *string   `json:"compose_path,omitempty"`
+	Port           *int      `json:"port,omitempty"`
 }
 
 // UploadFileRequest represents a file upload for manual deployment

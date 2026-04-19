@@ -21,7 +21,7 @@ func NewAppRepository(db *sql.DB) *AppRepository {
 func (r *AppRepository) Create(app *models.App) error {
 	query := `
 		INSERT INTO apps (
-			name, deployment_type, build_type, status, domain, env_vars,
+			name, deployment_type, build_type, status, domains, env_vars,
 			github_repo, github_branch, github_subdir, dockerfile_path,
 			compose_path, port, created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -34,7 +34,7 @@ func (r *AppRepository) Create(app *models.App) error {
 	result, err := r.db.Exec(
 		query,
 		app.Name, app.DeploymentType, app.BuildType, app.Status,
-		app.Domain, app.EnvVars, app.GitHubRepo, app.GitHubBranch,
+		app.Domains, app.EnvVars, app.GitHubRepo, app.GitHubBranch,
 		app.GitHubSubdir, app.DockerfilePath, app.ComposePath,
 		app.Port, app.CreatedAt, app.UpdatedAt,
 	)
@@ -54,7 +54,7 @@ func (r *AppRepository) Create(app *models.App) error {
 // GetByName retrieves an app by name
 func (r *AppRepository) GetByName(name string) (*models.App, error) {
 	query := `
-		SELECT id, name, deployment_type, build_type, status, domain, env_vars,
+		SELECT id, name, deployment_type, build_type, status, domains, env_vars,
 			github_repo, github_branch, github_subdir, dockerfile_path,
 			compose_path, port, created_at, updated_at, last_deployed_at
 		FROM apps
@@ -64,7 +64,7 @@ func (r *AppRepository) GetByName(name string) (*models.App, error) {
 	app := &models.App{}
 	err := r.db.QueryRow(query, name).Scan(
 		&app.ID, &app.Name, &app.DeploymentType, &app.BuildType,
-		&app.Status, &app.Domain, &app.EnvVars, &app.GitHubRepo,
+		&app.Status, &app.Domains, &app.EnvVars, &app.GitHubRepo,
 		&app.GitHubBranch, &app.GitHubSubdir, &app.DockerfilePath,
 		&app.ComposePath, &app.Port, &app.CreatedAt, &app.UpdatedAt,
 		&app.LastDeployedAt,
@@ -82,7 +82,7 @@ func (r *AppRepository) GetByName(name string) (*models.App, error) {
 // GetByID retrieves an app by ID
 func (r *AppRepository) GetByID(id int64) (*models.App, error) {
 	query := `
-		SELECT id, name, deployment_type, build_type, status, domain, env_vars,
+		SELECT id, name, deployment_type, build_type, status, domains, env_vars,
 			github_repo, github_branch, github_subdir, dockerfile_path,
 			compose_path, port, created_at, updated_at, last_deployed_at
 		FROM apps
@@ -92,7 +92,7 @@ func (r *AppRepository) GetByID(id int64) (*models.App, error) {
 	app := &models.App{}
 	err := r.db.QueryRow(query, id).Scan(
 		&app.ID, &app.Name, &app.DeploymentType, &app.BuildType,
-		&app.Status, &app.Domain, &app.EnvVars, &app.GitHubRepo,
+		&app.Status, &app.Domains, &app.EnvVars, &app.GitHubRepo,
 		&app.GitHubBranch, &app.GitHubSubdir, &app.DockerfilePath,
 		&app.ComposePath, &app.Port, &app.CreatedAt, &app.UpdatedAt,
 		&app.LastDeployedAt,
@@ -110,7 +110,7 @@ func (r *AppRepository) GetByID(id int64) (*models.App, error) {
 // List retrieves all apps
 func (r *AppRepository) List() ([]*models.App, error) {
 	query := `
-		SELECT id, name, deployment_type, build_type, status, domain, env_vars,
+		SELECT id, name, deployment_type, build_type, status, domains, env_vars,
 			github_repo, github_branch, github_subdir, dockerfile_path,
 			compose_path, port, created_at, updated_at, last_deployed_at
 		FROM apps
@@ -128,7 +128,7 @@ func (r *AppRepository) List() ([]*models.App, error) {
 		app := &models.App{}
 		err := rows.Scan(
 			&app.ID, &app.Name, &app.DeploymentType, &app.BuildType,
-			&app.Status, &app.Domain, &app.EnvVars, &app.GitHubRepo,
+			&app.Status, &app.Domains, &app.EnvVars, &app.GitHubRepo,
 			&app.GitHubBranch, &app.GitHubSubdir, &app.DockerfilePath,
 			&app.ComposePath, &app.Port, &app.CreatedAt, &app.UpdatedAt,
 			&app.LastDeployedAt,
@@ -146,7 +146,7 @@ func (r *AppRepository) List() ([]*models.App, error) {
 func (r *AppRepository) Update(app *models.App) error {
 	query := `
 		UPDATE apps SET
-			deployment_type = ?, build_type = ?, status = ?, domain = ?,
+			deployment_type = ?, build_type = ?, status = ?, domains = ?,
 			env_vars = ?, github_repo = ?, github_branch = ?, github_subdir = ?,
 			dockerfile_path = ?, compose_path = ?, port = ?, updated_at = ?,
 			last_deployed_at = ?
@@ -157,7 +157,7 @@ func (r *AppRepository) Update(app *models.App) error {
 
 	_, err := r.db.Exec(
 		query,
-		app.DeploymentType, app.BuildType, app.Status, app.Domain,
+		app.DeploymentType, app.BuildType, app.Status, app.Domains,
 		app.EnvVars, app.GitHubRepo, app.GitHubBranch, app.GitHubSubdir,
 		app.DockerfilePath, app.ComposePath, app.Port, app.UpdatedAt,
 		app.LastDeployedAt, app.ID,

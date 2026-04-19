@@ -150,14 +150,43 @@ func (s *DockerService) CreateNetwork(ctx context.Context, networkName string) e
 }
 
 // GenerateTraefikLabels generates Traefik labels for a container
-func GenerateTraefikLabels(appName, domain string, port int, enableTLS bool) map[string]string {
+func GenerateTraefikLabels(appName string, domains []string, port int, enableTLS bool) map[string]string {
 	labels := map[string]string{
 		"traefik.enable": "true",
-		fmt.Sprintf("traefik.http.routers.%s.rule", appName): fmt.Sprintf("Host(`%s`)", domain),
-		fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port", appName): fmt.Sprintf("%d", port),
 	}
 
-	if enableTLS && domain != "" {
+	// If no domains are specified, skip creating routing rules
+	if len(domains) == 0 {
+		labels[fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port", appName)] = fmt.Sprintf("%d", port)
+		return labels
+	}
+
+	// Build Host() rule for multiple domains
+	// Format: Host(`domain1.com`) || Host(`domain2.com`)
+	var hostRules []string
+	for _, domain := range domains {
+		if domain != "" {
+			hostRules = append(hostRules, fmt.Sprintf("Host(`%s`)", domain))
+		}
+	}
+	
+	// Join rules with OR operator
+	rule := ""
+	if len(hostRules) > 0 {
+		rule = hostRules[0]
+		for i := 1; i < len(hostRules); i++ {
+			rule += " || " + hostRules[i]
+		}
+	}
+
+	if rule != "" {
+		labels[fmt.Sprintf("traefik.http.routers.%s.rule", appName)] = rule
+	}
+	
+	labels[fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port", appName)] = fmt.Sprintf("%d", port)
+
+	// Enable TLS if any domain is specified
+	if enableTLS && len(domains) > 0 {
 		labels[fmt.Sprintf("traefik.http.routers.%s.entrypoints", appName)] = "websecure"
 		labels[fmt.Sprintf("traefik.http.routers.%s.tls", appName)] = "true"
 		labels[fmt.Sprintf("traefik.http.routers.%s.tls.certresolver", appName)] = "letsencrypt"
@@ -169,7 +198,7 @@ func GenerateTraefikLabels(appName, domain string, port int, enableTLS bool) map
 }
 
 // CreateContainerConfig creates a container configuration with Traefik labels
-func CreateContainerConfig(imageName string, envVars map[string]string, appName string, domain string, port int, networks []string) (*container.Config, *container.HostConfig, *network.NetworkingConfig) {
+func CreateContainerConfig(imageName string, envVars map[string]string, appName string, domains []string, port int, networks []string) (*container.Config, *container.HostConfig, *network.NetworkingConfig) {
 	// Convert env vars to Docker format
 	env := []string{}
 	for key, value := range envVars {
@@ -177,7 +206,7 @@ func CreateContainerConfig(imageName string, envVars map[string]string, appName 
 	}
 
 	// Generate Traefik labels
-	labels := GenerateTraefikLabels(appName, domain, port, domain != "")
+	labels := GenerateTraefikLabels(appName, domains, port, len(domains) > 0)
 	labels["atmosphere.app"] = appName
 
 	// Container config

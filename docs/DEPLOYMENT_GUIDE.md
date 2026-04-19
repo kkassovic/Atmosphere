@@ -71,7 +71,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
     --arg github_repo "git@github.com:username/repository.git" \
     --arg github_branch "main" \
     --arg deployment_key "$(cat ~/.ssh/atmosphere_deploy)" \
-    --arg domain "app.example.com" \
+    --argjson domains '["app.example.com"]' \
     '{
       name: $name,
       deployment_type: $deployment_type,
@@ -79,7 +79,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
       github_repo: $github_repo,
       github_branch: $github_branch,
       deployment_key: $deployment_key,
-      domain: $domain,
+      domains: $domains,
       env_vars: {
         NODE_ENV: "production",
         DATABASE_URL: "postgresql://..."
@@ -727,20 +727,43 @@ apiKey := os.Getenv("API_KEY")
 
 ## Domain Configuration
 
-### Setting a Domain
+### Setting Domains
 
+Atmosphere supports **multiple HTTPS domains per app**. You can configure one or more domains:
+
+**Single domain:**
 ```json
 {
-  "domain": "myapp.example.com"
+  "domains": ["myapp.example.com"]
+}
+```
+
+**Multiple domains:**
+```json
+{
+  "domains": [
+    "myapp.example.com",
+    "app.example.org",
+    "www.myapp.com"
+  ]
+}
+```
+
+**No domain (local/internal only):**
+```json
+{
+  "domains": []
 }
 ```
 
 ### DNS Configuration
 
-Point your domain to your server IP:
+Point each domain to your server IP:
 
 ```
 A    myapp.example.com    →    YOUR_SERVER_IP
+A    app.example.org      →    YOUR_SERVER_IP
+A    www.myapp.com        →    YOUR_SERVER_IP
 ```
 
 Or use a wildcard:
@@ -751,30 +774,51 @@ A    *.example.com        →    YOUR_SERVER_IP
 ### HTTPS/SSL
 
 Traefik automatically:
-1. Obtains SSL certificate from Let's Encrypt
-2. Enables HTTPS
+1. Obtains SSL certificates from Let's Encrypt for **all configured domains**
+2. Enables HTTPS on all domains
 3. Redirects HTTP → HTTPS
 
 **Requirements**:
-- Domain must be publicly accessible
-- Points to your server
+- All domains must be publicly accessible
+- Point to your server
 - Ports 80 and 443 open
 - Valid email in Traefik config
 
-### Updating Domain
+### Updating Domains
 
+**Add more domains:**
 ```bash
 curl -X PUT http://localhost:3000/api/v1/apps/my-app \
   -H "Content-Type: application/json" \
   -d '{
-    "domain": "newdomain.example.com"
+    "domains": [
+      "myapp.example.com",
+      "newdomain.example.com",
+      "app.another-domain.org"
+    ]
   }'
 ```
 
-Then redeploy:
+**Remove all domains:**
+```bash
+curl -X PUT http://localhost:3000/api/v1/apps/my-app \
+  -H "Content-Type: application/json" \
+  -d '{"domains": []}'
+```
+
+Then redeploy to apply changes:
 ```bash
 curl -X POST http://localhost:3000/api/v1/apps/my-app/deploy
 ```
+
+### How Multiple Domains Work
+
+Traefik creates a routing rule with OR logic:
+```
+Host(`myapp.example.com`) || Host(`app.example.org`) || Host(`www.myapp.com`)
+```
+
+All domains route to the same app container. The app will see requests from all configured domains.
 
 ---
 
