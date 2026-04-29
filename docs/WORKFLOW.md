@@ -583,7 +583,7 @@ curl http://localhost:3000/api/v1/apps/myapp
 │ {                              │
 │   "name": "myapp",             │
 │   "status": "running",         │
-│   "domain": "...",             │
+│   "domains": ["..."],          │
 │   "last_deployed_at": "..."    │
 │ }                              │
 └────────────────────────────────┘

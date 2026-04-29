@@ -402,7 +402,7 @@ docker volume prune
        "github_repo": "git@github.com:yourusername/your-repo.git",
        "github_branch": "main",
        "deployment_key": "'"$(cat ~/.ssh/atmosphere_myapp)"'",
-       "domain": "myapp.yourdomain.com",
+       "domains": ["myapp.yourdomain.com"],
        "env_vars": {
          "APP_ENV": "production",
          "DB_PASSWORD": "secure_password_here",

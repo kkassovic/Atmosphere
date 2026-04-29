@@ -103,7 +103,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
     \"github_repo\": \"git@github.com:username/repository.git\",
     \"github_branch\": \"main\",
     \"deployment_key\": \"$DEPLOYMENT_KEY\",
-    \"domain\": \"app.example.com\",
+    \"domains\": [\"app.example.com\"],
     \"env_vars\": {
       \"NODE_ENV\": \"production\",
       \"DATABASE_URL\": \"postgresql://...\"
@@ -144,7 +144,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
       github_repo: $github_repo,
       github_branch: $github_branch,
       deployment_key: $deployment_key,
-      domain: $domain,
+      domains: [$domain],
       env_vars: {
         NODE_ENV: "production",
         DATABASE_URL: "postgresql://..."
@@ -174,7 +174,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
       github_repo: $github_repo,
       github_branch: $github_branch,
       deployment_key: $deployment_key,
-      domain: $domain,
+      domains: [$domain],
       env_vars: {
         NODE_ENV: "production",
         DATABASE_URL: "postgresql://..."
@@ -217,7 +217,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
       github_repo: $github_repo,
       github_branch: $github_branch,
       deployment_key: $deployment_key,
-      domain: $domain,
+      domains: [$domain],
       port: 3000,
       env_vars: {
         NODE_ENV: "production",
@@ -291,7 +291,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
     "name": "my-manual-app",
     "deployment_type": "manual",
     "build_type": "dockerfile",
-    "domain": "manual.example.com",
+    "domains": ["manual.example.com"],
     "port": 80
   }'
 ```
@@ -599,7 +599,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
       github_repo: $github_repo,
       github_branch: $github_branch,
       deployment_key: $deployment_key,
-      domain: $domain,
+      domains: [$domain],
       env_vars: {
         DB_PASSWORD: $db_password
       }
@@ -651,7 +651,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
       github_repo: $github_repo,
       github_branch: $github_branch,
       deployment_key: $deployment_key,
-      domain: $domain,
+      domains: [$domain],
       port: 3000,
       env_vars: {
         NODE_ENV: "production"
@@ -755,6 +755,38 @@ Atmosphere supports **multiple HTTPS domains per app**. You can configure one or
   "domains": []
 }
 ```
+
+### Example: Create App with 2 Domains
+
+Here's a complete example creating a GitHub-deployed app with two domains:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n \
+    --arg name "my-multi-domain-app" \
+    --arg github_repo "git@github.com:username/repo.git" \
+    --arg deployment_key "$(cat ~/.ssh/deploy_key)" \
+    '{
+      name: $name,
+      deployment_type: "github",
+      build_type: "compose",
+      compose_path: "docker-compose.prod.yml",
+      github_repo: $github_repo,
+      github_branch: "main",
+      deployment_key: $deployment_key,
+      domains: [
+        "myapp.example.com",
+        "www.myapp.example.com"
+      ],
+      env_vars: {
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://..."
+      }
+    }')"
+```
+
+This creates an app accessible on both `myapp.example.com` and `www.myapp.example.com` with automatic HTTPS certificates for both domains.
 
 ### DNS Configuration
 
@@ -949,7 +981,7 @@ curl -X POST http://localhost:3000/api/v1/apps/my-app/deploy
       github_repo: $github_repo,
       github_branch: $github_branch,
       deployment_key: $deployment_key,
-      domain: $domain,
+      domains: [$domain],
       env_vars: {
         NODE_ENV: "production"
       }
@@ -1475,7 +1507,7 @@ Use this checklist to ensure your app gets HTTPS with automatic SSL certificates
   - [ ] `traefik.http.services.${ATMOSPHERE_APP}.loadbalancer.server.port=<YOUR_PORT>`
 
 ### 3. Atmosphere Configuration
-- [ ] App created with correct domain: `"domain": "yourdomain.com"`
+- [ ] App created with correct domain: `"domains": ["yourdomain.com"]`
 - [ ] If using custom compose file: `"compose_path": "docker-compose.prod.yml"`
 - [ ] Deployment successful (check logs)
 

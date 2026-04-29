@@ -561,7 +561,7 @@ curl -X POST http://localhost:3000/api/v1/apps \
       github_repo: "git@github.com:username/repo.git",
       github_branch: "main",
       deployment_key: $deployment_key,
-      domain: "test.example.com"
+         domains: ["test.example.com"]
     }')"
 ```
 

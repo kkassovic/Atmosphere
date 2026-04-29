@@ -946,7 +946,7 @@ curl -X POST http://localhost:3000/api/v1/apps/my-app/deploy
 # 1. Update domain
 curl -X PUT http://localhost:3000/api/v1/apps/my-app \
   -H "Content-Type: application/json" \
-  -d '{"domain": "newdomain.example.com"}'
+  -d '{"domains": ["newdomain.example.com"]}'
 
 # 2. Update DNS to point to server
 # (Do this manually in your DNS provider)
@@ -1156,7 +1156,7 @@ curl -X POST http://localhost:3000/api/v1/apps/my-app/start
 # Update app
 curl -X PUT http://localhost:3000/api/v1/apps/my-app \
   -H "Content-Type: application/json" \
-  -d '{"domain": "newdomain.com"}'
+  -d '{"domains": ["newdomain.com"]}'
 
 # Delete app
 curl -X DELETE http://localhost:3000/api/v1/apps/my-app

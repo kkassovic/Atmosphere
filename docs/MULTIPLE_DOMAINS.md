@@ -18,12 +18,14 @@ Atmosphere supports configuring **multiple HTTPS domains** for a single applicat
 
 ### What Changed
 
-**Before (single domain):**
+**Legacy (single domain, historical reference only):**
 ```json
 {
   "domain": "app.example.com"
 }
 ```
+
+Do not use this payload with the current API. Use `domains` instead.
 
 **Now (multiple domains):**
 ```json
@@ -413,14 +415,14 @@ func isValidDomain(host string) bool {
 
 ## Migration from Single Domain
 
-If you have existing apps using the old single-domain configuration:
+If you have existing payloads or scripts using a single-domain field, update them to the current API format:
 
-### Automatic Migration
+### Payload Migration
 
-Atmosphere automatically migrates existing apps:
-- Old `domain` field is converted to `domains` array with one element
-- Existing apps continue working without changes
-- You can update to multiple domains anytime
+Use `domains` (array) in create/update requests:
+- Replace `"domain": "app.example.com"` with `"domains": ["app.example.com"]`
+- Existing apps keep their stored domains; this section is about request payload format
+- You can always provide multiple domains later by updating the array
 
 ### Manual Update
 
