@@ -78,10 +78,55 @@ func (s *AppService) GetAppBackup(name, backupID string) (*models.AppBackup, err
 }
 
 // StartAppRestore starts an asynchronous restore for one app from one backup.
-func (s *AppService) StartAppRestore(name, backupID string) (*models.AppRestore, error) {
+func (s *AppService) StartAppRestore(name, backupID string, restoreAsNew bool, newAppName string) (*models.AppRestore, error) {
 	app, err := s.GetApp(name)
 	if err != nil {
 		return nil, err
+	}
+
+	targetApp := app
+	if restoreAsNew {
+		if !isValidAppName(newAppName) {
+			return nil, fmt.Errorf("invalid new_app_name: must be lowercase alphanumeric with hyphens, max 32 chars")
+		}
+
+		existing, err := s.repo.GetByName(newAppName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check target app: %w", err)
+		}
+		if existing != nil {
+			return nil, fmt.Errorf("app with name %s already exists", newAppName)
+		}
+
+		envVarsCopy := make(models.EnvVars)
+		for k, v := range app.EnvVars {
+			envVarsCopy[k] = v
+		}
+
+		clone := &models.App{
+			Name:           newAppName,
+			DeploymentType: app.DeploymentType,
+			BuildType:      app.BuildType,
+			Status:         "stopped",
+			Domains:        []string{},
+			EnvVars:        envVarsCopy,
+			GitHubRepo:     app.GitHubRepo,
+			GitHubBranch:   app.GitHubBranch,
+			GitHubSubdir:   app.GitHubSubdir,
+			DockerfilePath: app.DockerfilePath,
+			ComposePath:    app.ComposePath,
+			Port:           app.Port,
+		}
+
+		if err := os.MkdirAll(filepath.Join(s.cfg.WorkspacesDir, clone.Name), 0755); err != nil {
+			return nil, fmt.Errorf("failed to create new app workspace: %w", err)
+		}
+
+		if err := s.repo.Create(clone); err != nil {
+			return nil, fmt.Errorf("failed to create new app for restore: %w", err)
+		}
+
+		targetApp = clone
 	}
 
 	backup, err := s.repo.GetAppBackupByBackupID(app.ID, backupID)
@@ -107,7 +152,7 @@ func (s *AppService) StartAppRestore(name, backupID string) (*models.AppRestore,
 		return nil, fmt.Errorf("failed to create app restore record: %w", err)
 	}
 
-	go s.runAppRestore(app, backup, restore)
+	go s.runAppRestore(app, targetApp, backup, restore, restoreAsNew)
 
 	return restore, nil
 }
@@ -215,7 +260,7 @@ func (s *AppService) runAppBackup(app *models.App, backup *models.AppBackup) {
 	_ = s.repo.UpdateAppBackup(backup)
 }
 
-func (s *AppService) runAppRestore(app *models.App, backup *models.AppBackup, restore *models.AppRestore) {
+func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App, backup *models.AppBackup, restore *models.AppRestore, restoreAsNew bool) {
 	var logBuilder strings.Builder
 	ctx := context.Background()
 
@@ -223,16 +268,16 @@ func (s *AppService) runAppRestore(app *models.App, backup *models.AppBackup, re
 		logBuilder.WriteString(fmt.Sprintf("[%s] %s\n", time.Now().Format("15:04:05"), line))
 	}
 
-	appendLog(fmt.Sprintf("Starting restore for app %s from %s", app.Name, backup.BackupID))
+	appendLog(fmt.Sprintf("Starting restore for app %s from %s", targetApp.Name, backup.BackupID))
 
 	if _, err := os.Stat(backup.Path); err != nil {
 		s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("backup path unavailable: %w", err))
 		return
 	}
 
-	wasRunning := app.Status == "running"
+	wasRunning := !restoreAsNew && sourceApp.Status == "running"
 	if wasRunning {
-		if err := s.deploymentService.Stop(ctx, app); err != nil {
+		if err := s.deploymentService.Stop(ctx, sourceApp); err != nil {
 			appendLog(fmt.Sprintf("Warning: failed to stop running app before restore: %v", err))
 		} else {
 			appendLog("Stopped app containers before restore")
@@ -241,7 +286,7 @@ func (s *AppService) runAppRestore(app *models.App, backup *models.AppBackup, re
 
 	workspaceArchive := filepath.Join(backup.Path, "workspace.tar.gz")
 	if _, err := os.Stat(workspaceArchive); err == nil {
-		workspaceDir := filepath.Join(s.cfg.WorkspacesDir, app.Name)
+		workspaceDir := filepath.Join(s.cfg.WorkspacesDir, targetApp.Name)
 		if err := os.RemoveAll(workspaceDir); err != nil {
 			s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to clean workspace: %w", err))
 			return
@@ -259,7 +304,7 @@ func (s *AppService) runAppRestore(app *models.App, backup *models.AppBackup, re
 
 	backupKeyPath := filepath.Join(backup.Path, "deployment.key")
 	if _, err := os.Stat(backupKeyPath); err == nil {
-		targetKeyPath := filepath.Join(s.cfg.KeysDir, fmt.Sprintf("%s.key", app.Name))
+		targetKeyPath := filepath.Join(s.cfg.KeysDir, fmt.Sprintf("%s.key", targetApp.Name))
 		if err := os.MkdirAll(s.cfg.KeysDir, 0700); err != nil {
 			s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to prepare keys directory: %w", err))
 			return
@@ -279,28 +324,30 @@ func (s *AppService) runAppRestore(app *models.App, backup *models.AppBackup, re
 			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".tar.gz") {
 				continue
 			}
-			volumeName := restoreVolumeNameFromArchive(entry.Name())
-			if volumeName == "" {
+			sourceVolumeName := restoreVolumeNameFromArchive(entry.Name())
+			if sourceVolumeName == "" {
 				appendLog(fmt.Sprintf("Skipping invalid volume archive name: %s", entry.Name()))
 				continue
 			}
 
-			if err := s.deploymentService.dockerService.EnsureVolume(ctx, volumeName); err != nil {
-				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to ensure volume %s: %w", volumeName, err))
+			targetVolumeName := mapVolumeNameForRestore(sourceVolumeName, sourceApp.Name, targetApp.Name, restoreAsNew)
+
+			if err := s.deploymentService.dockerService.EnsureVolume(ctx, targetVolumeName); err != nil {
+				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to ensure volume %s: %w", targetVolumeName, err))
 				return
 			}
 
 			sourceFile := filepath.Join(volumesDir, entry.Name())
-			if err := restoreDockerVolume(ctx, volumeName, sourceFile); err != nil {
-				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore volume %s: %w", volumeName, err))
+			if err := restoreDockerVolume(ctx, targetVolumeName, sourceFile); err != nil {
+				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore volume %s: %w", targetVolumeName, err))
 				return
 			}
-			appendLog(fmt.Sprintf("Restored volume %s", volumeName))
+			appendLog(fmt.Sprintf("Restored volume %s (source %s)", targetVolumeName, sourceVolumeName))
 		}
 	}
 
 	if wasRunning {
-		if err := s.deploymentService.Start(ctx, app); err != nil {
+		if err := s.deploymentService.Restart(ctx, sourceApp); err != nil {
 			appendLog(fmt.Sprintf("Warning: failed to restart app after restore: %v", err))
 		} else {
 			appendLog("Restarted app containers")
@@ -553,4 +600,20 @@ func restoreDockerVolume(ctx context.Context, volumeName, sourceFile string) err
 		return fmt.Errorf("docker volume restore command failed: %w (%s)", err, strings.TrimSpace(string(output)))
 	}
 	return nil
+}
+
+func mapVolumeNameForRestore(sourceVolumeName, sourceAppName, targetAppName string, restoreAsNew bool) string {
+	if !restoreAsNew || sourceAppName == targetAppName {
+		return sourceVolumeName
+	}
+
+	// Compose project volumes usually look like atmosphere-<app>_<volume>.
+	prefix := fmt.Sprintf("atmosphere-%s_", sourceAppName)
+	if strings.HasPrefix(sourceVolumeName, prefix) {
+		suffix := strings.TrimPrefix(sourceVolumeName, prefix)
+		return fmt.Sprintf("atmosphere-%s_%s", targetAppName, suffix)
+	}
+
+	// Fallback replacement for custom names containing source app name.
+	return strings.ReplaceAll(sourceVolumeName, sourceAppName, targetAppName)
 }

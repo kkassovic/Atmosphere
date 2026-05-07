@@ -223,7 +223,7 @@ func (h *Handler) StartAppRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restore, err := h.appService.StartAppRestore(name, req.BackupID)
+	restore, err := h.appService.StartAppRestore(name, req.BackupID, req.RestoreAsNew, req.NewAppName)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return

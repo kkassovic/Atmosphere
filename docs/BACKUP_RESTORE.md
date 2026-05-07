@@ -11,9 +11,10 @@ This guide explains how to use per-app backup and restore in atmosphere.
 5. [Check Backup Status](#check-backup-status)
 6. [List Backups for an App](#list-backups-for-an-app)
 7. [Restore App from Backup](#restore-app-from-backup)
-8. [Check Restore Status](#check-restore-status)
-9. [Backup Storage Location](#backup-storage-location)
-10. [Troubleshooting](#troubleshooting)
+8. [Restore as New App](#restore-as-new-app)
+9. [Check Restore Status](#check-restore-status)
+10. [Backup Storage Location](#backup-storage-location)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -119,6 +120,10 @@ curl -X POST http://localhost:3000/api/v1/apps/my-app/restores \
   }'
 ```
 
+Optional restore fields:
+- `restore_as_new` (boolean)
+- `new_app_name` (required when `restore_as_new=true`)
+
 Example response (`202 Accepted`):
 
 ```json
@@ -135,6 +140,26 @@ Example response (`202 Accepted`):
   }
 }
 ```
+
+## Restore as New App
+
+Restore one app backup into a separate app name:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/apps/openproject/restores \
+  -H "Content-Type: application/json" \
+  -d '{
+    "backup_id": "openproject-1746659903",
+    "restore_as_new": true,
+    "new_app_name": "openproject-restore"
+  }'
+```
+
+Behavior:
+- new app record is created
+- new app starts with empty domains to avoid routing conflicts
+- workspace and key are restored under the new app name
+- compose-style volume names are remapped to the new app prefix
 
 ## Check Restore Status
 
@@ -213,4 +238,4 @@ docker info
 
 1. Current implementation is app-scoped only (one app at a time).
 2. Backups are local artifacts; remote storage and retention automation can be added later.
-3. Restore targets the same app name and existing app record.
+3. Restore supports both in-place mode and `restore_as_new` mode.

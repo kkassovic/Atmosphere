@@ -319,6 +319,14 @@ func (s *DeploymentService) deployCompose(ctx context.Context, app *models.App, 
 
 // stopExistingContainers stops containers for an app
 func (s *DeploymentService) stopExistingContainers(ctx context.Context, app *models.App, logOutput *strings.Builder) error {
+	if app.BuildType == "compose" {
+		if err := s.runComposeLifecycle(ctx, app, []string{"down", "--remove-orphans"}); err == nil {
+			logOutput.WriteString(fmt.Sprintf("[%s] Stopped existing compose stack\n", time.Now().Format("15:04:05")))
+			return nil
+		}
+		// Fallback to label-based cleanup if compose cleanup fails.
+	}
+
 	containers, err := s.dockerService.GetContainersByLabel(ctx, "atmosphere.app", app.Name)
 	if err != nil {
 		return err
@@ -339,6 +347,13 @@ func (s *DeploymentService) stopExistingContainers(ctx context.Context, app *mod
 
 // Stop stops an application
 func (s *DeploymentService) Stop(ctx context.Context, app *models.App) error {
+	if app.BuildType == "compose" {
+		if err := s.runComposeLifecycle(ctx, app, []string{"stop"}); err == nil {
+			return nil
+		}
+		// Fallback to label-based stop for backward compatibility.
+	}
+
 	containers, err := s.dockerService.GetContainersByLabel(ctx, "atmosphere.app", app.Name)
 	if err != nil {
 		return err
@@ -355,6 +370,13 @@ func (s *DeploymentService) Stop(ctx context.Context, app *models.App) error {
 
 // Start starts an application
 func (s *DeploymentService) Start(ctx context.Context, app *models.App) error {
+	if app.BuildType == "compose" {
+		if err := s.runComposeLifecycle(ctx, app, []string{"start"}); err == nil {
+			return nil
+		}
+		// Fallback to label-based start for backward compatibility.
+	}
+
 	containers, err := s.dockerService.GetContainersByLabel(ctx, "atmosphere.app", app.Name)
 	if err != nil {
 		return err
@@ -367,6 +389,22 @@ func (s *DeploymentService) Start(ctx context.Context, app *models.App) error {
 	}
 
 	return nil
+}
+
+// Restart restarts an application.
+func (s *DeploymentService) Restart(ctx context.Context, app *models.App) error {
+	if app.BuildType == "compose" {
+		if err := s.runComposeLifecycle(ctx, app, []string{"restart"}); err == nil {
+			return nil
+		}
+		// Fallback to stop/start if compose restart is unavailable.
+	}
+
+	if err := s.Stop(ctx, app); err != nil {
+		return err
+	}
+
+	return s.Start(ctx, app)
 }
 
 // Remove removes an application and its containers
@@ -414,6 +452,43 @@ func (s *DeploymentService) getDeploymentKeyPath(appName string) string {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func (s *DeploymentService) runComposeLifecycle(ctx context.Context, app *models.App, lifecycleArgs []string) error {
+	workspaceDir := s.getWorkspaceDir(app.Name)
+	buildDir := workspaceDir
+	if app.GitHubSubdir != "" {
+		buildDir = filepath.Join(workspaceDir, app.GitHubSubdir)
+	}
+
+	composePath := ""
+	if app.ComposePath != "" {
+		composePath = filepath.Join(buildDir, app.ComposePath)
+	} else {
+		composePath = s.DetectComposeFile(buildDir)
+	}
+	if composePath == "" {
+		return fmt.Errorf("no docker-compose file found for app %s", app.Name)
+	}
+
+	projectName := fmt.Sprintf("atmosphere-%s", app.Name)
+	composeArgs := []string{"compose"}
+	baseCompose := filepath.Join(buildDir, "docker-compose.yml")
+	if composePath != baseCompose && fileExists(baseCompose) {
+		composeArgs = append(composeArgs, "-f", baseCompose, "-f", composePath)
+	} else {
+		composeArgs = append(composeArgs, "-f", composePath)
+	}
+	composeArgs = append(composeArgs, "-p", projectName)
+	composeArgs = append(composeArgs, lifecycleArgs...)
+
+	cmd := s.CreateComposeCommand(ctx, buildDir, composeArgs, app)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("docker compose %s failed: %w (%s)", strings.Join(lifecycleArgs, " "), err, strings.TrimSpace(string(output)))
+	}
+
+	return nil
 }
 
 func (s *DeploymentService) createEnvFile(path string, envVars map[string]string) error {

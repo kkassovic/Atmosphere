@@ -168,5 +168,7 @@ type AppRestore struct {
 
 // CreateAppRestoreRequest starts a restore for an app from backup_id
 type CreateAppRestoreRequest struct {
-	BackupID string `json:"backup_id"`
+	BackupID      string `json:"backup_id"`
+	RestoreAsNew  bool   `json:"restore_as_new,omitempty"`
+	NewAppName    string `json:"new_app_name,omitempty"`
 }
