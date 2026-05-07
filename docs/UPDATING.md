@@ -25,14 +25,15 @@ git pull origin main
 
 # 3. Rebuild binary to correct location
 cd ~/atmosphere/backend
-go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
+go build -o ./atmosphere ./cmd/atmosphere
+sudo install -m 0755 ./atmosphere /opt/atmosphere/atmosphere
 
 # 4. Restart service
-systemctl restart atmosphere
+sudo systemctl restart atmosphere
 
 # 5. Verify
-systemctl status atmosphere
-journalctl -u atmosphere -n 50
+sudo systemctl status atmosphere
+sudo journalctl -u atmosphere -n 50
 ```
 
 ---
@@ -132,9 +133,10 @@ go mod tidy
 The service runs from `/opt/atmosphere/atmosphere` (NOT `/usr/local/bin/atmosphere`).
 
 ```bash
-# Build to correct location (from backend directory)
+# Build and install to correct location (from backend directory)
 cd ~/atmosphere/backend
-go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
+go build -o ./atmosphere ./cmd/atmosphere
+sudo install -m 0755 ./atmosphere /opt/atmosphere/atmosphere
 
 # Verify binary was created
 ls -lh /opt/atmosphere/atmosphere
@@ -191,7 +193,7 @@ Check that Atmosphere is running correctly:
 
 ```bash
 # Check service logs
-journalctl -u atmosphere -n 50 -f
+sudo journalctl -u atmosphere -n 50 -f
 
 # Test API health
 curl http://localhost:3000/health
@@ -215,7 +217,7 @@ Verify the correct binary is running:
 
 ```bash
 # Should show /opt/atmosphere/atmosphere
-lsof -p $(pgrep atmosphere) | grep atmosphere
+sudo lsof -p $(pgrep atmosphere) | grep atmosphere
 ```
 
 **Expected output:**
