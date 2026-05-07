@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 )
@@ -147,6 +150,51 @@ func (s *DockerService) CreateNetwork(ctx context.Context, networkName string) e
 		return fmt.Errorf("failed to create network: %w", err)
 	}
 	return nil
+}
+
+// EnsureVolume ensures a Docker volume exists.
+func (s *DockerService) EnsureVolume(ctx context.Context, volumeName string) error {
+	_, err := s.client.VolumeInspect(ctx, volumeName)
+	if err == nil {
+		return nil
+	}
+
+	_, err = s.client.VolumeCreate(ctx, volume.CreateOptions{Name: volumeName})
+	if err != nil {
+		return fmt.Errorf("failed to create volume %s: %w", volumeName, err)
+	}
+
+	return nil
+}
+
+// GetVolumeNamesByApp returns unique named Docker volume names mounted by app containers.
+func (s *DockerService) GetVolumeNamesByApp(ctx context.Context, appName string) ([]string, error) {
+	containers, err := s.GetContainersByLabel(ctx, "atmosphere.app", appName)
+	if err != nil {
+		return nil, err
+	}
+
+	volumeMap := make(map[string]struct{})
+	for _, c := range containers {
+		inspect, err := s.client.ContainerInspect(ctx, c.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to inspect container %s: %w", c.ID[:12], err)
+		}
+
+		for _, m := range inspect.Mounts {
+			if m.Type == mount.TypeVolume && m.Name != "" {
+				volumeMap[m.Name] = struct{}{}
+			}
+		}
+	}
+
+	volumes := make([]string, 0, len(volumeMap))
+	for name := range volumeMap {
+		volumes = append(volumes, name)
+	}
+	sort.Strings(volumes)
+
+	return volumes, nil
 }
 
 // GenerateTraefikLabels generates Traefik labels for a container

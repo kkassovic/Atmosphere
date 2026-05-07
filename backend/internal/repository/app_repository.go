@@ -252,3 +252,216 @@ func (r *AppRepository) GetDeploymentLogs(appID int64, limit int) ([]*models.Dep
 
 	return logs, nil
 }
+
+// CreateAppBackup creates an app backup entry
+func (r *AppRepository) CreateAppBackup(backup *models.AppBackup) error {
+	query := `
+		INSERT INTO app_backups (backup_id, app_id, status, path, size_bytes, log, started_at, completed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	backup.StartedAt = time.Now()
+
+	result, err := r.db.Exec(
+		query,
+		backup.BackupID,
+		backup.AppID,
+		backup.Status,
+		backup.Path,
+		backup.SizeBytes,
+		backup.Log,
+		backup.StartedAt,
+		backup.CompletedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create app backup: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get app backup last insert id: %w", err)
+	}
+
+	backup.ID = id
+	return nil
+}
+
+// UpdateAppBackup updates an app backup entry
+func (r *AppRepository) UpdateAppBackup(backup *models.AppBackup) error {
+	query := `
+		UPDATE app_backups
+		SET status = ?, path = ?, size_bytes = ?, log = ?, completed_at = ?
+		WHERE id = ?
+	`
+
+	_, err := r.db.Exec(
+		query,
+		backup.Status,
+		backup.Path,
+		backup.SizeBytes,
+		backup.Log,
+		backup.CompletedAt,
+		backup.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update app backup: %w", err)
+	}
+
+	return nil
+}
+
+// GetAppBackupByBackupID gets an app backup by app id and backup id
+func (r *AppRepository) GetAppBackupByBackupID(appID int64, backupID string) (*models.AppBackup, error) {
+	query := `
+		SELECT id, backup_id, app_id, status, path, size_bytes, log, started_at, completed_at
+		FROM app_backups
+		WHERE app_id = ? AND backup_id = ?
+	`
+
+	backup := &models.AppBackup{}
+	err := r.db.QueryRow(query, appID, backupID).Scan(
+		&backup.ID,
+		&backup.BackupID,
+		&backup.AppID,
+		&backup.Status,
+		&backup.Path,
+		&backup.SizeBytes,
+		&backup.Log,
+		&backup.StartedAt,
+		&backup.CompletedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get app backup: %w", err)
+	}
+
+	return backup, nil
+}
+
+// ListAppBackups lists app backups for one app
+func (r *AppRepository) ListAppBackups(appID int64, limit int) ([]*models.AppBackup, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	query := `
+		SELECT id, backup_id, app_id, status, path, size_bytes, log, started_at, completed_at
+		FROM app_backups
+		WHERE app_id = ?
+		ORDER BY started_at DESC
+		LIMIT ?
+	`
+
+	rows, err := r.db.Query(query, appID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list app backups: %w", err)
+	}
+	defer rows.Close()
+
+	backups := []*models.AppBackup{}
+	for rows.Next() {
+		backup := &models.AppBackup{}
+		err := rows.Scan(
+			&backup.ID,
+			&backup.BackupID,
+			&backup.AppID,
+			&backup.Status,
+			&backup.Path,
+			&backup.SizeBytes,
+			&backup.Log,
+			&backup.StartedAt,
+			&backup.CompletedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan app backup: %w", err)
+		}
+		backups = append(backups, backup)
+	}
+
+	return backups, nil
+}
+
+// CreateAppRestore creates an app restore entry
+func (r *AppRepository) CreateAppRestore(restore *models.AppRestore) error {
+	query := `
+		INSERT INTO app_restores (restore_id, app_id, backup_id, status, log, started_at, completed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`
+
+	restore.StartedAt = time.Now()
+
+	result, err := r.db.Exec(
+		query,
+		restore.RestoreID,
+		restore.AppID,
+		restore.BackupID,
+		restore.Status,
+		restore.Log,
+		restore.StartedAt,
+		restore.CompletedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create app restore: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("failed to get app restore last insert id: %w", err)
+	}
+
+	restore.ID = id
+	return nil
+}
+
+// UpdateAppRestore updates an app restore entry
+func (r *AppRepository) UpdateAppRestore(restore *models.AppRestore) error {
+	query := `
+		UPDATE app_restores
+		SET status = ?, log = ?, completed_at = ?
+		WHERE id = ?
+	`
+
+	_, err := r.db.Exec(
+		query,
+		restore.Status,
+		restore.Log,
+		restore.CompletedAt,
+		restore.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update app restore: %w", err)
+	}
+
+	return nil
+}
+
+// GetAppRestoreByRestoreID gets one restore by app id and restore id
+func (r *AppRepository) GetAppRestoreByRestoreID(appID int64, restoreID string) (*models.AppRestore, error) {
+	query := `
+		SELECT id, restore_id, app_id, backup_id, status, log, started_at, completed_at
+		FROM app_restores
+		WHERE app_id = ? AND restore_id = ?
+	`
+
+	restore := &models.AppRestore{}
+	err := r.db.QueryRow(query, appID, restoreID).Scan(
+		&restore.ID,
+		&restore.RestoreID,
+		&restore.AppID,
+		&restore.BackupID,
+		&restore.Status,
+		&restore.Log,
+		&restore.StartedAt,
+		&restore.CompletedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get app restore: %w", err)
+	}
+
+	return restore, nil
+}

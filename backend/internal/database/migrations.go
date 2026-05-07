@@ -10,6 +10,8 @@ func RunMigrations(db *sql.DB) error {
 	migrations := []string{
 		createAppsTable,
 		createDeploymentLogsTable,
+		createAppBackupsTable,
+		createAppRestoresTable,
 		createIndexes,
 	}
 
@@ -60,11 +62,45 @@ CREATE TABLE IF NOT EXISTS deployment_logs (
 );
 `
 
+const createAppBackupsTable = `
+CREATE TABLE IF NOT EXISTS app_backups (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	backup_id TEXT NOT NULL UNIQUE,
+	app_id INTEGER NOT NULL,
+	status TEXT NOT NULL CHECK(status IN ('in_progress', 'success', 'failed')),
+	path TEXT NOT NULL,
+	size_bytes INTEGER NOT NULL DEFAULT 0,
+	log TEXT,
+	started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	completed_at DATETIME,
+	FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE
+);
+`
+
+const createAppRestoresTable = `
+CREATE TABLE IF NOT EXISTS app_restores (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	restore_id TEXT NOT NULL UNIQUE,
+	app_id INTEGER NOT NULL,
+	backup_id TEXT NOT NULL,
+	status TEXT NOT NULL CHECK(status IN ('in_progress', 'success', 'failed')),
+	log TEXT,
+	started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	completed_at DATETIME,
+	FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE,
+	FOREIGN KEY (backup_id) REFERENCES app_backups(backup_id) ON DELETE RESTRICT
+);
+`
+
 const createIndexes = `
 CREATE INDEX IF NOT EXISTS idx_apps_name ON apps(name);
 CREATE INDEX IF NOT EXISTS idx_apps_status ON apps(status);
 CREATE INDEX IF NOT EXISTS idx_deployment_logs_app_id ON deployment_logs(app_id);
 CREATE INDEX IF NOT EXISTS idx_deployment_logs_started_at ON deployment_logs(started_at);
+CREATE INDEX IF NOT EXISTS idx_app_backups_app_id ON app_backups(app_id);
+CREATE INDEX IF NOT EXISTS idx_app_backups_started_at ON app_backups(started_at);
+CREATE INDEX IF NOT EXISTS idx_app_restores_app_id ON app_restores(app_id);
+CREATE INDEX IF NOT EXISTS idx_app_restores_started_at ON app_restores(started_at);
 `
 
 // migrateDomainToDomainsFunc handles the migration from domain (string) to domains (JSON array)

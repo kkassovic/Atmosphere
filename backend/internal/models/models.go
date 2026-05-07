@@ -140,3 +140,33 @@ type FileInfo struct {
 	ModTime time.Time `json:"mod_time"`
 	IsDir   bool      `json:"is_dir"`
 }
+
+// AppBackup represents a single app backup run
+type AppBackup struct {
+	ID          int64      `json:"id"`
+	BackupID    string     `json:"backup_id"`
+	AppID       int64      `json:"app_id"`
+	Status      string     `json:"status"` // "in_progress", "success", "failed"
+	Path        string     `json:"path"`
+	SizeBytes   int64      `json:"size_bytes"`
+	Log         string     `json:"log"`
+	StartedAt   time.Time  `json:"started_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+}
+
+// AppRestore represents a single app restore run
+type AppRestore struct {
+	ID          int64      `json:"id"`
+	RestoreID   string     `json:"restore_id"`
+	AppID       int64      `json:"app_id"`
+	BackupID    string     `json:"backup_id"`
+	Status      string     `json:"status"` // "in_progress", "success", "failed"
+	Log         string     `json:"log"`
+	StartedAt   time.Time  `json:"started_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+}
+
+// CreateAppRestoreRequest starts a restore for an app from backup_id
+type CreateAppRestoreRequest struct {
+	BackupID string `json:"backup_id"`
+}

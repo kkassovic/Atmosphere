@@ -159,6 +159,96 @@ func (h *Handler) GetDeploymentLogs(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, logs)
 }
 
+// CreateAppBackup handles POST /api/v1/apps/{name}/backups
+func (h *Handler) CreateAppBackup(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	backup, err := h.appService.CreateAppBackup(name)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusAccepted, map[string]interface{}{
+		"message": "App backup started",
+		"backup":  backup,
+	})
+}
+
+// ListAppBackups handles GET /api/v1/apps/{name}/backups
+func (h *Handler) ListAppBackups(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	limit := 20
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	backups, err := h.appService.ListAppBackups(name, limit)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, backups)
+}
+
+// GetAppBackup handles GET /api/v1/apps/{name}/backups/{backupID}
+func (h *Handler) GetAppBackup(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	backupID := chi.URLParam(r, "backupID")
+
+	backup, err := h.appService.GetAppBackup(name, backupID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, backup)
+}
+
+// StartAppRestore handles POST /api/v1/apps/{name}/restores
+func (h *Handler) StartAppRestore(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	var req models.CreateAppRestoreRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	if req.BackupID == "" {
+		respondError(w, http.StatusBadRequest, "backup_id is required")
+		return
+	}
+
+	restore, err := h.appService.StartAppRestore(name, req.BackupID)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusAccepted, map[string]interface{}{
+		"message": "App restore started",
+		"restore": restore,
+	})
+}
+
+// GetAppRestore handles GET /api/v1/apps/{name}/restores/{restoreID}
+func (h *Handler) GetAppRestore(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	restoreID := chi.URLParam(r, "restoreID")
+
+	restore, err := h.appService.GetAppRestore(name, restoreID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, restore)
+}
+
 // UploadFile handles POST /api/v1/apps/{name}/files
 func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")

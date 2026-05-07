@@ -68,6 +68,13 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		// Logs
 		r.Get("/apps/{name}/logs", handler.GetDeploymentLogs)
 
+		// App backups and restores
+		r.Post("/apps/{name}/backups", handler.CreateAppBackup)
+		r.Get("/apps/{name}/backups", handler.ListAppBackups)
+		r.Get("/apps/{name}/backups/{backupID}", handler.GetAppBackup)
+		r.Post("/apps/{name}/restores", handler.StartAppRestore)
+		r.Get("/apps/{name}/restores/{restoreID}", handler.GetAppRestore)
+
 		// File upload (manual deployments)
 		r.Post("/apps/{name}/files", handler.UploadFile)
 		
