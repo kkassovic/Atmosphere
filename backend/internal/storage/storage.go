@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"io"
 )
 
 // BackupStorage is an interface for storing and retrieving backups

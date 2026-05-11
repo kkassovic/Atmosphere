@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -199,10 +198,11 @@ func (s *S3Storage) Delete(ctx context.Context, remotePath string) error {
 
 // Exists checks if a backup exists in S3
 func (s *S3Storage) Exists(ctx context.Context, remotePath string) (bool, error) {
+	maxKeys := int32(1)
 	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(s.bucket),
-		Prefix: aws.String(remotePath),
-		MaxKeys: 1,
+		Bucket:  aws.String(s.bucket),
+		Prefix:  aws.String(remotePath),
+		MaxKeys: &maxKeys,
 	})
 
 	for paginator.HasMorePages() {
