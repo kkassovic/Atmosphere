@@ -85,11 +85,11 @@ func (s *S3Storage) Upload(ctx context.Context, localPath string, backupID strin
 			return fmt.Errorf("error computing relative path: %w", err)
 		}
 
-			   s3Key := filepath.Join(remotePath, relPath)
-			   // Normalize path separators for S3 (always use /)
-			   s3Key = strings.ReplaceAll(s3Key, "\\", "/")
-			   // Remove any leading dashes or slashes
-			   s3Key = strings.TrimLeft(s3Key, "-/")
+			s3Key := filepath.Join(remotePath, relPath)
+			s3Key = sanitizeS3ObjectKey(s3Key)
+			if s3Key == "" {
+				return fmt.Errorf("computed empty S3 key for file %s (remotePath=%q, relPath=%q, prefix=%q)", path, remotePath, relPath, s.pathPrefix)
+			}
 
 		file, err := os.Open(path)
 		if err != nil {
@@ -104,7 +104,7 @@ func (s *S3Storage) Upload(ctx context.Context, localPath string, backupID strin
 			ACL:    types.ObjectCannedACLPrivate, // Keep backups private
 		})
 		if err != nil {
-			return fmt.Errorf("error uploading %s to S3: %w", path, err)
+			return fmt.Errorf("error uploading %s to S3 (bucket=%q, key=%q, remotePath=%q, prefix=%q): %w", path, s.bucket, s3Key, remotePath, s.pathPrefix, err)
 		}
 
 		return nil
@@ -115,6 +115,23 @@ func (s *S3Storage) Upload(ctx context.Context, localPath string, backupID strin
 	}
 
 	return remotePath, nil
+}
+
+func sanitizeS3ObjectKey(key string) string {
+	// S3 keys must use forward slashes and must not include control characters.
+	key = strings.ReplaceAll(key, "\\", "/")
+	key = strings.Map(func(r rune) rune {
+		if r < 32 || r == 127 {
+			return -1
+		}
+		return r
+	}, key)
+	key = strings.TrimSpace(key)
+	key = strings.TrimLeft(key, "-/")
+	for strings.Contains(key, "//") {
+		key = strings.ReplaceAll(key, "//", "/")
+	}
+	return key
 }
 
 // Download downloads a backup from S3 to local path
