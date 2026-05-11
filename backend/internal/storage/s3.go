@@ -52,7 +52,12 @@ func NewS3Storage(endpoint, bucket, region, accessKey, secretKey, pathPrefix str
 		cfg.Region = "us-east-1" // Default region for S3-compatible services
 	}
 
-	client := s3.NewFromConfig(*cfg)
+	// Use path-style addressing to avoid bucket-prefix mutation in virtual-host mode.
+	// This prevents keys like "atmosphere-backups/..." from being rewritten to "-backups/..."
+	// when bucket is "atmosphere".
+	client := s3.NewFromConfig(*cfg, func(o *s3.Options) {
+		o.UsePathStyle = true
+	})
 
 	return &S3Storage{
 		client:     client,
