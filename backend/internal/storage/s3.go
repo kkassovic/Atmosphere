@@ -28,6 +28,11 @@ func NewS3Storage(endpoint, bucket, region, accessKey, secretKey, pathPrefix str
 		return nil, fmt.Errorf("S3 endpoint, bucket, accessKey, and secretKey are required")
 	}
 
+	pathPrefix = strings.TrimSpace(pathPrefix)
+	pathPrefix = strings.ReplaceAll(pathPrefix, "\\", "/")
+	pathPrefix = strings.TrimLeft(pathPrefix, "-/")
+	pathPrefix = strings.TrimRight(pathPrefix, "/")
+
 	// Create custom resolver for S3-compatible services
 	resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		if service == s3.ServiceID {

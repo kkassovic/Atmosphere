@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -53,7 +54,7 @@ func Load() (*Config, error) {
 		S3Region:     getEnv("S3_REGION", ""),
 		S3AccessKey:  getEnv("S3_ACCESS_KEY", ""),
 		S3SecretKey:  getEnv("S3_SECRET_KEY", ""),
-		S3PathPrefix: getEnv("S3_PATH_PREFIX", "atmosphere-backups"),
+		S3PathPrefix: sanitizeS3PathPrefix(getEnv("S3_PATH_PREFIX", "atmosphere-backups")),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -102,4 +103,15 @@ func getEnv(key, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+
+func sanitizeS3PathPrefix(prefix string) string {
+	prefix = strings.TrimSpace(prefix)
+	prefix = strings.ReplaceAll(prefix, "\\", "/")
+	prefix = strings.TrimLeft(prefix, "-/")
+	prefix = strings.TrimRight(prefix, "/")
+	if prefix == "" {
+		return "atmosphere-backups"
+	}
+	return prefix
 }
