@@ -48,6 +48,18 @@ Edit the configuration file:
 sudo nano /opt/atmosphere/.env
 ```
 
+The atmosphere systemd service reads `/opt/atmosphere/.env`.
+If you create or edit `.env` in your git checkout (for example `~/atmosphere/.env`), copy it to `/opt/atmosphere/.env` and restart:
+
+```bash
+cd ~/atmosphere
+cp .env.example .env
+nano .env
+
+sudo cp .env /opt/atmosphere/.env
+sudo systemctl restart atmosphere
+```
+
 **Important**: Set your email for Let's Encrypt:
 ```bash
 LETSENCRYPT_EMAIL=your-email@example.com

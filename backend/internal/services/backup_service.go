@@ -77,6 +77,43 @@ func (s *AppService) GetAppBackup(name, backupID string) (*models.AppBackup, err
 	return backup, nil
 }
 
+// DeleteAppBackup deletes a backup from storage and database
+func (s *AppService) DeleteAppBackup(name string, backupID string) error {
+	app, err := s.GetApp(name)
+	if err != nil {
+		return err
+	}
+
+	// Get backup record to find storage path
+	backup, err := s.repo.GetAppBackupByBackupID(app.ID, backupID)
+	if err != nil {
+		return fmt.Errorf("failed to get backup: %w", err)
+	}
+	if backup == nil {
+		return fmt.Errorf("backup not found")
+	}
+
+	// Delete from remote storage (S3 or local)
+	if backup.S3Path != "" {
+		// Backup was stored in S3
+		if err := s.backupStorage.Delete(context.Background(), backup.S3Path); err != nil {
+			return fmt.Errorf("failed to delete from S3: %w", err)
+		}
+	} else if backup.Path != "" {
+		// Backup is in local storage
+		if err := os.RemoveAll(backup.Path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("failed to delete local backup: %w", err)
+		}
+	}
+
+	// Delete from database
+	if err := s.repo.DeleteAppBackup(app.ID, backupID); err != nil {
+		return fmt.Errorf("failed to delete backup record: %w", err)
+	}
+
+	return nil
+}
+
 // StartAppRestore starts an asynchronous restore for one app from one backup.
 func (s *AppService) StartAppRestore(name, backupID, sourceApp string, restoreAsNew bool, newAppName string) (*models.AppRestore, error) {
 	app, err := s.GetApp(name)

@@ -96,6 +96,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		r.Post("/apps/{name}/backups", handler.CreateAppBackup)
 		r.Get("/apps/{name}/backups", handler.ListAppBackups)
 		r.Get("/apps/{name}/backups/{backupID}", handler.GetAppBackup)
+		r.Delete("/apps/{name}/backups/{backupID}", handler.DeleteAppBackup)
 		r.Post("/apps/{name}/restores", handler.StartAppRestore)
 		r.Get("/apps/{name}/restores/{restoreID}", handler.GetAppRestore)
 

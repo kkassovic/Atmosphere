@@ -2,6 +2,14 @@
 
 Atmosphere supports three backup storage backends, each with different advantages:
 
+Important: if you run atmosphere via systemd, the service reads configuration from `/opt/atmosphere/.env`.
+If you edit `.env` in your repository checkout (for example `~/atmosphere/.env`), copy it to `/opt/atmosphere/.env` and restart the service.
+
+```bash
+sudo cp ~/atmosphere/.env /opt/atmosphere/.env
+sudo systemctl restart atmosphere
+```
+
 ## Option 1: DigitalOcean S3 / AWS S3 (Cloud Storage)
 
 **Best for:** Remote offsite backups, disaster recovery across data centers

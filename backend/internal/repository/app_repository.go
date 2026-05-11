@@ -395,6 +395,16 @@ func (r *AppRepository) ListAppBackups(appID int64, limit int) ([]*models.AppBac
 	return backups, nil
 }
 
+// DeleteAppBackup deletes an app backup record
+func (r *AppRepository) DeleteAppBackup(appID int64, backupID string) error {
+	query := `DELETE FROM app_backups WHERE app_id = ? AND backup_id = ?`
+	_, err := r.db.Exec(query, appID, backupID)
+	if err != nil {
+		return fmt.Errorf("failed to delete app backup: %w", err)
+	}
+	return nil
+}
+
 // CreateAppRestore creates an app restore entry
 func (r *AppRepository) CreateAppRestore(restore *models.AppRestore) error {
 	query := `

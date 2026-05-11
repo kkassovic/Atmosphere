@@ -79,6 +79,20 @@ sudo cp .env.example .env
 sudo nano .env
 ```
 
+Important for systemd deployments:
+
+- The running service reads `/opt/atmosphere/.env`.
+- If you edit `.env` in your repository checkout (for example `~/atmosphere/.env`), copy it to `/opt/atmosphere/.env` before restarting.
+
+```bash
+cd ~/atmosphere
+cp .env.example .env
+nano .env
+
+sudo cp .env /opt/atmosphere/.env
+sudo systemctl restart atmosphere
+```
+
 Key configuration options:
 - `PORT`: API server port (default: 3000)
 - `DATABASE_PATH`: SQLite database path

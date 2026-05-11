@@ -51,6 +51,18 @@ S3_SECRET_KEY=YOUR_DO_SPACES_SECRET
 S3_PATH_PREFIX=atmosphere-backups  # Optional prefix in bucket
 ```
 
+For systemd installations, these variables must be in `/opt/atmosphere/.env`.
+If you prepared `.env` inside your repository directory, copy it to the service location and restart:
+
+```bash
+cd ~/atmosphere
+cp .env.example .env
+nano .env
+
+sudo cp .env /opt/atmosphere/.env
+sudo systemctl restart atmosphere
+```
+
 ### Verify S3 Configuration
 
 Before running backups, verify your S3 connection:

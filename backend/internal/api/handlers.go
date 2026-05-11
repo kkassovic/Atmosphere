@@ -213,6 +213,19 @@ func (h *Handler) GetAppBackup(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, backup)
 }
 
+// DeleteAppBackup handles DELETE /api/v1/apps/{name}/backups/{backupID}
+func (h *Handler) DeleteAppBackup(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	backupID := chi.URLParam(r, "backupID")
+
+	if err := h.appService.DeleteAppBackup(name, backupID); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "Backup deleted successfully"})
+}
+
 // StartAppRestore handles POST /api/v1/apps/{name}/restores
 func (h *Handler) StartAppRestore(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
