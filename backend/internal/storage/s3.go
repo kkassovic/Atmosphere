@@ -1,11 +1,13 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -135,6 +137,39 @@ func sanitizeS3ObjectKey(key string) string {
 		key = strings.ReplaceAll(key, "//", "/")
 	}
 	return key
+}
+
+// WriteProbe validates that the configured credentials can write to and delete from S3.
+func (s *S3Storage) WriteProbe(ctx context.Context, prefix string) error {
+	probePrefix := sanitizeS3ObjectKey(prefix)
+	if probePrefix == "" {
+		probePrefix = "atmosphere-backups"
+	}
+
+	probeKey := sanitizeS3ObjectKey(filepath.Join(probePrefix, "healthcheck", fmt.Sprintf("probe-%d.txt", time.Now().UnixNano())))
+	if probeKey == "" {
+		return fmt.Errorf("failed to build S3 probe key")
+	}
+
+	body := bytes.NewReader([]byte("atmosphere-s3-write-probe"))
+	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(probeKey),
+		Body:   body,
+	})
+	if err != nil {
+		return fmt.Errorf("write probe failed for bucket=%q key=%q: %w", s.bucket, probeKey, err)
+	}
+
+	_, err = s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(probeKey),
+	})
+	if err != nil {
+		return fmt.Errorf("write probe cleanup failed for bucket=%q key=%q: %w", s.bucket, probeKey, err)
+	}
+
+	return nil
 }
 
 // Download downloads a backup from S3 to local path

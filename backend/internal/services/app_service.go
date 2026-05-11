@@ -639,6 +639,21 @@ func (s *AppService) CheckBackupStorageHealth(ctx context.Context) (map[string]i
 			return result, nil
 		}
 
+		// Optional write probe for concrete PutObject/DeleteObject permission validation.
+		type s3WriteProber interface {
+			WriteProbe(ctx context.Context, prefix string) error
+		}
+		if prober, ok := s.backupStorage.(s3WriteProber); ok {
+			if err := prober.WriteProbe(ctx, s.cfg.S3PathPrefix); err != nil {
+				result["status"] = "warning"
+				result["s3_write"] = "failed"
+				result["s3_write_error"] = err.Error()
+				result["message"] = "S3 read access is OK, but write probe failed"
+				return result, nil
+			}
+			result["s3_write"] = "ok"
+		}
+
 		result["message"] = "S3 connection successful"
 		return result, nil
 	}
