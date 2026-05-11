@@ -80,9 +80,11 @@ func (s *S3Storage) Upload(ctx context.Context, localPath string, backupID strin
 			return fmt.Errorf("error computing relative path: %w", err)
 		}
 
-		s3Key := filepath.Join(remotePath, relPath)
-		// Normalize path separators for S3 (always use /)
-		s3Key = strings.ReplaceAll(s3Key, "\\", "/")
+			   s3Key := filepath.Join(remotePath, relPath)
+			   // Normalize path separators for S3 (always use /)
+			   s3Key = strings.ReplaceAll(s3Key, "\\", "/")
+			   // Remove any leading dashes or slashes
+			   s3Key = strings.TrimLeft(s3Key, "-/")
 
 		file, err := os.Open(path)
 		if err != nil {
