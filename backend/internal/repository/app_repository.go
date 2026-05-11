@@ -256,8 +256,8 @@ func (r *AppRepository) GetDeploymentLogs(appID int64, limit int) ([]*models.Dep
 // CreateAppBackup creates an app backup entry
 func (r *AppRepository) CreateAppBackup(backup *models.AppBackup) error {
 	query := `
-		INSERT INTO app_backups (backup_id, app_id, status, path, size_bytes, log, started_at, completed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO app_backups (backup_id, app_id, status, path, size_bytes, log, started_at, completed_at, s3_path, uploaded_to_s3, s3_uploaded_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	backup.StartedAt = time.Now()
@@ -272,6 +272,9 @@ func (r *AppRepository) CreateAppBackup(backup *models.AppBackup) error {
 		backup.Log,
 		backup.StartedAt,
 		backup.CompletedAt,
+		backup.S3Path,
+		backup.UploadedToS3,
+		backup.S3UploadedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create app backup: %w", err)
@@ -290,7 +293,7 @@ func (r *AppRepository) CreateAppBackup(backup *models.AppBackup) error {
 func (r *AppRepository) UpdateAppBackup(backup *models.AppBackup) error {
 	query := `
 		UPDATE app_backups
-		SET status = ?, path = ?, size_bytes = ?, log = ?, completed_at = ?
+		SET status = ?, path = ?, size_bytes = ?, log = ?, completed_at = ?, s3_path = ?, uploaded_to_s3 = ?, s3_uploaded_at = ?
 		WHERE id = ?
 	`
 
@@ -301,6 +304,9 @@ func (r *AppRepository) UpdateAppBackup(backup *models.AppBackup) error {
 		backup.SizeBytes,
 		backup.Log,
 		backup.CompletedAt,
+		backup.S3Path,
+		backup.UploadedToS3,
+		backup.S3UploadedAt,
 		backup.ID,
 	)
 	if err != nil {
@@ -313,7 +319,7 @@ func (r *AppRepository) UpdateAppBackup(backup *models.AppBackup) error {
 // GetAppBackupByBackupID gets an app backup by app id and backup id
 func (r *AppRepository) GetAppBackupByBackupID(appID int64, backupID string) (*models.AppBackup, error) {
 	query := `
-		SELECT id, backup_id, app_id, status, path, size_bytes, log, started_at, completed_at
+		SELECT id, backup_id, app_id, status, path, size_bytes, log, started_at, completed_at, s3_path, uploaded_to_s3, s3_uploaded_at
 		FROM app_backups
 		WHERE app_id = ? AND backup_id = ?
 	`
@@ -329,6 +335,9 @@ func (r *AppRepository) GetAppBackupByBackupID(appID int64, backupID string) (*m
 		&backup.Log,
 		&backup.StartedAt,
 		&backup.CompletedAt,
+		&backup.S3Path,
+		&backup.UploadedToS3,
+		&backup.S3UploadedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -347,7 +356,7 @@ func (r *AppRepository) ListAppBackups(appID int64, limit int) ([]*models.AppBac
 	}
 
 	query := `
-		SELECT id, backup_id, app_id, status, path, size_bytes, log, started_at, completed_at
+		SELECT id, backup_id, app_id, status, path, size_bytes, log, started_at, completed_at, s3_path, uploaded_to_s3, s3_uploaded_at
 		FROM app_backups
 		WHERE app_id = ?
 		ORDER BY started_at DESC
@@ -373,6 +382,9 @@ func (r *AppRepository) ListAppBackups(appID int64, limit int) ([]*models.AppBac
 			&backup.Log,
 			&backup.StartedAt,
 			&backup.CompletedAt,
+			&backup.S3Path,
+			&backup.UploadedToS3,
+			&backup.S3UploadedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan app backup: %w", err)

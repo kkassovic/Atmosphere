@@ -163,7 +163,11 @@ func (h *Handler) GetDeploymentLogs(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateAppBackup(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 
-	backup, err := h.appService.CreateAppBackup(name)
+	var req models.CreateAppBackupRequest
+	// Decode request body if present (optional)
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	backup, err := h.appService.CreateAppBackup(name, req.UploadToS3)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
@@ -223,7 +227,7 @@ func (h *Handler) StartAppRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restore, err := h.appService.StartAppRestore(name, req.BackupID, req.RestoreAsNew, req.NewAppName)
+	restore, err := h.appService.StartAppRestore(name, req.BackupID, req.SourceApp, req.RestoreAsNew, req.NewAppName)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
@@ -356,6 +360,20 @@ func (h *Handler) GetMergedComposeConfig(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(config))
+}
+
+// CheckBackupStorageHealth handles GET /api/v1/backup-storage/health
+func (h *Handler) CheckBackupStorageHealth(w http.ResponseWriter, r *http.Request) {
+	health, err := h.appService.CheckBackupStorageHealth(r.Context())
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]interface{}{
+			"status": "error",
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, health)
 }
 
 // Helper functions for responses

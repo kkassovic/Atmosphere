@@ -20,6 +20,14 @@ type Config struct {
 	Domain         string
 	LetsEncryptEmail string
 	TraefikDashboard bool
+
+	// S3 Backup Storage Configuration (optional)
+	S3Endpoint   string
+	S3Bucket     string
+	S3Region     string
+	S3AccessKey  string
+	S3SecretKey  string
+	S3PathPrefix string
 }
 
 // Load reads configuration from environment variables
@@ -39,6 +47,13 @@ func Load() (*Config, error) {
 		Domain:           getEnv("DOMAIN", ""),
 		LetsEncryptEmail: getEnv("LETSENCRYPT_EMAIL", "admin@example.com"),
 		TraefikDashboard: getEnv("TRAEFIK_DASHBOARD", "false") == "true",
+		// S3 Configuration (optional)
+		S3Endpoint:   getEnv("S3_ENDPOINT", ""),
+		S3Bucket:     getEnv("S3_BUCKET", ""),
+		S3Region:     getEnv("S3_REGION", ""),
+		S3AccessKey:  getEnv("S3_ACCESS_KEY", ""),
+		S3SecretKey:  getEnv("S3_SECRET_KEY", ""),
+		S3PathPrefix: getEnv("S3_PATH_PREFIX", "atmosphere-backups"),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -72,6 +87,12 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("TRAEFIK_NETWORK cannot be empty")
 	}
 	return nil
+}
+
+// IsS3Enabled checks if S3 backup storage is configured
+func (c *Config) IsS3Enabled() bool {
+	return c.S3Endpoint != "" && c.S3Bucket != "" && 
+	       c.S3AccessKey != "" && c.S3SecretKey != ""
 }
 
 // getEnv retrieves an environment variable or returns a default value

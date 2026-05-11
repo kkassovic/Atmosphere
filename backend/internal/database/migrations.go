@@ -26,6 +26,11 @@ func RunMigrations(db *sql.DB) error {
 		return fmt.Errorf("domain to domains migration failed: %w", err)
 	}
 
+	// Run S3 backup fields migration
+	if err := migrateAppBackupsForS3(db); err != nil {
+		return fmt.Errorf("S3 backup fields migration failed: %w", err)
+	}
+
 	return nil
 }
 
@@ -150,6 +155,62 @@ func migrateDomainToDomainsFunc(db *sql.DB) error {
 		`)
 		if err != nil {
 			return fmt.Errorf("failed to migrate domain data: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// migrateAppBackupsForS3 adds S3-related columns to app_backups table if they don't exist
+func migrateAppBackupsForS3(db *sql.DB) error {
+	// Check if the S3 columns already exist
+	rows, err := db.Query("PRAGMA table_info(app_backups)")
+	if err != nil {
+		return fmt.Errorf("failed to query table info: %w", err)
+	}
+	defer rows.Close()
+
+	s3PathExists := false
+	uploadedToS3Exists := false
+	s3UploadedAtExists := false
+
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dfltValue interface{}
+
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dfltValue, &pk); err != nil {
+			return fmt.Errorf("failed to scan column info: %w", err)
+		}
+
+		if name == "s3_path" {
+			s3PathExists = true
+		}
+		if name == "uploaded_to_s3" {
+			uploadedToS3Exists = true
+		}
+		if name == "s3_uploaded_at" {
+			s3UploadedAtExists = true
+		}
+	}
+
+	// Add missing columns
+	if !s3PathExists {
+		if _, err := db.Exec("ALTER TABLE app_backups ADD COLUMN s3_path TEXT DEFAULT ''"); err != nil {
+			return fmt.Errorf("failed to add s3_path column: %w", err)
+		}
+	}
+
+	if !uploadedToS3Exists {
+		if _, err := db.Exec("ALTER TABLE app_backups ADD COLUMN uploaded_to_s3 BOOLEAN DEFAULT 0"); err != nil {
+			return fmt.Errorf("failed to add uploaded_to_s3 column: %w", err)
+		}
+	}
+
+	if !s3UploadedAtExists {
+		if _, err := db.Exec("ALTER TABLE app_backups ADD COLUMN s3_uploaded_at DATETIME"); err != nil {
+			return fmt.Errorf("failed to add s3_uploaded_at column: %w", err)
 		}
 	}
 

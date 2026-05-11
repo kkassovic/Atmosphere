@@ -4,6 +4,7 @@ import (
 	"atmosphere/internal/config"
 	"atmosphere/internal/models"
 	"atmosphere/internal/repository"
+	"atmosphere/internal/storage"
 	"context"
 	"fmt"
 	"os"
@@ -18,14 +19,16 @@ type AppService struct {
 	repo              *repository.AppRepository
 	cfg               *config.Config
 	deploymentService *DeploymentService
+	backupStorage     storage.BackupStorage
 }
 
 // NewAppService creates a new app service
-func NewAppService(repo *repository.AppRepository, cfg *config.Config, deploymentService *DeploymentService) *AppService {
+func NewAppService(repo *repository.AppRepository, cfg *config.Config, deploymentService *DeploymentService, backupStorage storage.BackupStorage) *AppService {
 	return &AppService{
 		repo:              repo,
 		cfg:               cfg,
 		deploymentService: deploymentService,
+		backupStorage:     backupStorage,
 	}
 }
 
@@ -612,4 +615,49 @@ func (s *AppService) GetMergedComposeConfig(name string) (string, error) {
 	}
 
 	return string(output), nil
+}
+
+// CheckBackupStorageHealth checks if the configured backup storage is accessible
+func (s *AppService) CheckBackupStorageHealth(ctx context.Context) (map[string]interface{}, error) {
+	result := map[string]interface{}{
+		"status": "ok",
+	}
+
+	// Check if S3 is configured
+	if s.cfg.IsS3Enabled() {
+		result["backend"] = "s3"
+		result["s3_endpoint"] = s.cfg.S3Endpoint
+		result["s3_bucket"] = s.cfg.S3Bucket
+
+		// Test S3 connectivity by checking if bucket is accessible
+		if exists, err := s.backupStorage.Exists(ctx, ""); err != nil {
+			result["status"] = "warning"
+			result["s3_error"] = err.Error()
+			result["message"] = "S3 configured but not accessible"
+			return result, nil
+		}
+
+		result["message"] = "S3 connection successful"
+		return result, nil
+	}
+
+	// Local storage
+	logsDir := s.cfg.LogsDir
+	if _, err := os.Stat(logsDir); err != nil {
+		if os.IsNotExist(err) {
+			result["status"] = "warning"
+			result["backend"] = "local"
+			result["message"] = fmt.Sprintf("Logs directory does not exist: %s", logsDir)
+			return result, nil
+		}
+		result["status"] = "warning"
+		result["backend"] = "local"
+		result["error"] = err.Error()
+		return result, nil
+	}
+
+	result["backend"] = "local"
+	result["logs_dir"] = logsDir
+	result["message"] = "Local storage accessible"
+	return result, nil
 }

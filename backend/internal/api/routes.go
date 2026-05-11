@@ -4,7 +4,9 @@ import (
 	"atmosphere/internal/config"
 	"atmosphere/internal/repository"
 	"atmosphere/internal/services"
+	"atmosphere/internal/storage"
 	"database/sql"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -41,7 +43,29 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		panic(err) // Fatal error if Docker is not available
 	}
 	deploymentService := services.NewDeploymentService(cfg, dockerService)
-	appService := services.NewAppService(appRepo, cfg, deploymentService)
+
+	// Initialize backup storage
+	storageConfig := &storage.StorageConfig{
+		LocalBasePath: cfg.LogsDir,
+	}
+	if cfg.IsS3Enabled() {
+		storageConfig.Type = "s3"
+		storageConfig.S3Endpoint = cfg.S3Endpoint
+		storageConfig.S3Bucket = cfg.S3Bucket
+		storageConfig.S3Region = cfg.S3Region
+		storageConfig.S3AccessKey = cfg.S3AccessKey
+		storageConfig.S3SecretKey = cfg.S3SecretKey
+		storageConfig.S3PathPrefix = cfg.S3PathPrefix
+	}
+
+	backupStorage, err := storage.NewBackupStorage(storageConfig)
+	if err != nil {
+		fmt.Printf("Warning: failed to initialize backup storage: %v\n", err)
+		// Fall back to local storage
+		backupStorage, _ = storage.NewLocalStorage(cfg.LogsDir)
+	}
+
+	appService := services.NewAppService(appRepo, cfg, deploymentService, backupStorage)
 
 	// Initialize handler
 	handler := NewHandler(appService)
@@ -84,6 +108,9 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		
 		// Compose config
 		r.Get("/apps/{name}/compose-config", handler.GetMergedComposeConfig)
+
+		// Backup storage health check
+		r.Get("/backup-storage/health", handler.CheckBackupStorageHealth)
 	})
 
 	return r

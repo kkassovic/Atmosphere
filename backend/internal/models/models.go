@@ -143,15 +143,19 @@ type FileInfo struct {
 
 // AppBackup represents a single app backup run
 type AppBackup struct {
-	ID          int64      `json:"id"`
-	BackupID    string     `json:"backup_id"`
-	AppID       int64      `json:"app_id"`
-	Status      string     `json:"status"` // "in_progress", "success", "failed"
-	Path        string     `json:"path"`
-	SizeBytes   int64      `json:"size_bytes"`
-	Log         string     `json:"log"`
-	StartedAt   time.Time  `json:"started_at"`
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	ID              int64      `json:"id"`
+	BackupID        string     `json:"backup_id"`
+	AppID           int64      `json:"app_id"`
+	Status          string     `json:"status"` // "in_progress", "success", "failed"
+	Path            string     `json:"path"`
+	SizeBytes       int64      `json:"size_bytes"`
+	Log             string     `json:"log"`
+	StartedAt       time.Time  `json:"started_at"`
+	CompletedAt     *time.Time `json:"completed_at,omitempty"`
+	// S3 Storage fields
+	S3Path          string     `json:"s3_path,omitempty"`        // Remote S3 path if uploaded
+	UploadedToS3    bool       `json:"uploaded_to_s3,omitempty"` // Whether backup is in S3
+	S3UploadedAt    *time.Time `json:"s3_uploaded_at,omitempty"` // When uploaded to S3
 }
 
 // AppRestore represents a single app restore run
@@ -169,6 +173,12 @@ type AppRestore struct {
 // CreateAppRestoreRequest starts a restore for an app from backup_id
 type CreateAppRestoreRequest struct {
 	BackupID      string `json:"backup_id"`
+	SourceApp     string `json:"source_app,omitempty"`      // Original app name (for S3 backups)
 	RestoreAsNew  bool   `json:"restore_as_new,omitempty"`
 	NewAppName    string `json:"new_app_name,omitempty"`
+}
+
+// CreateAppBackupRequest starts a backup for an app
+type CreateAppBackupRequest struct {
+	UploadToS3 bool `json:"upload_to_s3,omitempty"` // Upload to S3 after creating backup
 }

@@ -18,7 +18,7 @@ import (
 )
 
 // CreateAppBackup starts an asynchronous backup for one app.
-func (s *AppService) CreateAppBackup(name string) (*models.AppBackup, error) {
+func (s *AppService) CreateAppBackup(name string, uploadToS3 bool) (*models.AppBackup, error) {
 	app, err := s.GetApp(name)
 	if err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func (s *AppService) CreateAppBackup(name string) (*models.AppBackup, error) {
 		return nil, fmt.Errorf("failed to create app backup record: %w", err)
 	}
 
-	go s.runAppBackup(app, backup)
+	go s.runAppBackup(app, backup, uploadToS3)
 
 	return backup, nil
 }
@@ -78,7 +78,7 @@ func (s *AppService) GetAppBackup(name, backupID string) (*models.AppBackup, err
 }
 
 // StartAppRestore starts an asynchronous restore for one app from one backup.
-func (s *AppService) StartAppRestore(name, backupID string, restoreAsNew bool, newAppName string) (*models.AppRestore, error) {
+func (s *AppService) StartAppRestore(name, backupID, sourceApp string, restoreAsNew bool, newAppName string) (*models.AppRestore, error) {
 	app, err := s.GetApp(name)
 	if err != nil {
 		return nil, err
@@ -129,10 +129,20 @@ func (s *AppService) StartAppRestore(name, backupID string, restoreAsNew bool, n
 		targetApp = clone
 	}
 
+	// Try to find the backup in the current app first
 	backup, err := s.repo.GetAppBackupByBackupID(app.ID, backupID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load backup: %w", err)
 	}
+
+	// If not found in current app and sourceApp is provided, look for it in the source app
+	if backup == nil && sourceApp != "" {
+		sourceAppObj, err := s.GetApp(sourceApp)
+		if err == nil {
+			backup, _ = s.repo.GetAppBackupByBackupID(sourceAppObj.ID, backupID)
+		}
+	}
+
 	if backup == nil {
 		return nil, fmt.Errorf("backup not found")
 	}
@@ -175,7 +185,7 @@ func (s *AppService) GetAppRestore(name, restoreID string) (*models.AppRestore, 
 	return restore, nil
 }
 
-func (s *AppService) runAppBackup(app *models.App, backup *models.AppBackup) {
+func (s *AppService) runAppBackup(app *models.App, backup *models.AppBackup, uploadToS3 bool) {
 	var logBuilder strings.Builder
 	ctx := context.Background()
 
@@ -252,6 +262,22 @@ func (s *AppService) runAppBackup(app *models.App, backup *models.AppBackup) {
 		return
 	}
 
+	// Upload to S3 if requested
+	if uploadToS3 && s.backupStorage != nil {
+		appendLog("Uploading backup to S3...")
+		s3Path, err := s.backupStorage.Upload(ctx, backup.Path, backup.BackupID, app.Name)
+		if err != nil {
+			// Log the error but don't fail the backup - S3 is optional
+			appendLog(fmt.Sprintf("Warning: Failed to upload to S3: %v", err))
+		} else {
+			backup.S3Path = s3Path
+			backup.UploadedToS3 = true
+			uploadTime := time.Now()
+			backup.S3UploadedAt = &uploadTime
+			appendLog(fmt.Sprintf("Successfully uploaded to S3: %s", s3Path))
+		}
+	}
+
 	now := time.Now()
 	backup.Status = "success"
 	backup.SizeBytes = sizeBytes
@@ -270,9 +296,27 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 
 	appendLog(fmt.Sprintf("Starting restore for app %s from %s", targetApp.Name, backup.BackupID))
 
-	if _, err := os.Stat(backup.Path); err != nil {
-		s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("backup path unavailable: %w", err))
-		return
+	backupPath := backup.Path
+
+	// If backup doesn't exist locally but is in S3, download it
+	if _, err := os.Stat(backupPath); err != nil && os.IsNotExist(err) {
+		if backup.UploadedToS3 && backup.S3Path != "" && s.backupStorage != nil {
+			appendLog(fmt.Sprintf("Backup not found locally, downloading from S3: %s", backup.S3Path))
+			// Create local backup directory for download
+			if err := os.MkdirAll(backupPath, 0755); err != nil {
+				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to create backup directory: %w", err))
+				return
+			}
+
+			if err := s.backupStorage.Download(ctx, backup.BackupID, backup.S3Path, backupPath); err != nil {
+				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to download from S3: %w", err))
+				return
+			}
+			appendLog(fmt.Sprintf("Successfully downloaded from S3 to %s", backupPath))
+		} else {
+			s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("backup path unavailable: %w", err))
+			return
+		}
 	}
 
 	wasRunning := !restoreAsNew && sourceApp.Status == "running"
@@ -284,7 +328,7 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 		}
 	}
 
-	workspaceArchive := filepath.Join(backup.Path, "workspace.tar.gz")
+	workspaceArchive := filepath.Join(backupPath, "workspace.tar.gz")
 	if _, err := os.Stat(workspaceArchive); err == nil {
 		workspaceDir := filepath.Join(s.cfg.WorkspacesDir, targetApp.Name)
 		if err := os.RemoveAll(workspaceDir); err != nil {
@@ -302,7 +346,7 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 		appendLog("Restored workspace")
 	}
 
-	backupKeyPath := filepath.Join(backup.Path, "deployment.key")
+	backupKeyPath := filepath.Join(backupPath, "deployment.key")
 	if _, err := os.Stat(backupKeyPath); err == nil {
 		targetKeyPath := filepath.Join(s.cfg.KeysDir, fmt.Sprintf("%s.key", targetApp.Name))
 		if err := os.MkdirAll(s.cfg.KeysDir, 0700); err != nil {
@@ -316,7 +360,7 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 		appendLog("Restored deployment key")
 	}
 
-	volumesDir := filepath.Join(backup.Path, "volumes")
+	volumesDir := filepath.Join(backupPath, "volumes")
 	entries, err := os.ReadDir(volumesDir)
 	if err == nil {
 		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
