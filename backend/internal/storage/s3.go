@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // S3Storage implements BackupStorage for S3-compatible services (DigitalOcean Spaces, AWS S3, etc)
@@ -106,7 +105,6 @@ func (s *S3Storage) Upload(ctx context.Context, localPath string, backupID strin
 			Bucket: aws.String(s.bucket),
 			Key:    aws.String(s3Key),
 			Body:   file,
-			ACL:    types.ObjectCannedACLPrivate, // Keep backups private
 		})
 		if err != nil {
 			return fmt.Errorf("error uploading %s to S3 (bucket=%q, key=%q, remotePath=%q, prefix=%q): %w", path, s.bucket, s3Key, remotePath, s.pathPrefix, err)
