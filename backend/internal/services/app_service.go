@@ -630,7 +630,7 @@ func (s *AppService) CheckBackupStorageHealth(ctx context.Context) (map[string]i
 		result["s3_bucket"] = s.cfg.S3Bucket
 
 		// Test S3 connectivity by checking if bucket is accessible
-		if exists, err := s.backupStorage.Exists(ctx, ""); err != nil {
+		if _, err := s.backupStorage.Exists(ctx, ""); err != nil {
 			result["status"] = "warning"
 			result["s3_error"] = err.Error()
 			result["message"] = "S3 configured but not accessible"
