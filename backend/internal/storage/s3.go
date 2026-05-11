@@ -272,6 +272,9 @@ func (s *S3Storage) GetRemotePath(appName string, backupID string) string {
 		path += "/"
 	}
 
+	// Remove any leading dashes or slashes
+	path = strings.TrimLeft(path, "-/")
+
 	return path
 }
 
