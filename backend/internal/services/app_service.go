@@ -628,6 +628,8 @@ func (s *AppService) CheckBackupStorageHealth(ctx context.Context) (map[string]i
 		result["backend"] = "s3"
 		result["s3_endpoint"] = s.cfg.S3Endpoint
 		result["s3_bucket"] = s.cfg.S3Bucket
+		result["s3_prefix"] = s.cfg.S3PathPrefix
+		result["s3_test_key"] = s.backupStorage.GetRemotePath("healthcheck", "probe")
 
 		// Test S3 connectivity by checking if bucket is accessible
 		if _, err := s.backupStorage.Exists(ctx, ""); err != nil {
