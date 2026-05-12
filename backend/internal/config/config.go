@@ -18,6 +18,7 @@ type Config struct {
 	LogsDir        string
 	DockerNetwork  string
 	TraefikNetwork string
+	TemplatesDir   string
 	Domain         string
 	LetsEncryptEmail string
 	TraefikDashboard bool
@@ -45,6 +46,7 @@ func Load() (*Config, error) {
 		LogsDir:          getEnv("LOGS_DIR", "/opt/atmosphere/logs"),
 		DockerNetwork:    getEnv("DOCKER_NETWORK", "atmosphere"),
 		TraefikNetwork:   getEnv("TRAEFIK_NETWORK", "traefik"),
+		TemplatesDir:     getEnv("TEMPLATES_DIR", "templates/apps"),
 		Domain:           getEnv("DOMAIN", ""),
 		LetsEncryptEmail: getEnv("LETSENCRYPT_EMAIL", "admin@example.com"),
 		TraefikDashboard: getEnv("TRAEFIK_DASHBOARD", "false") == "true",
@@ -86,6 +88,9 @@ func (c *Config) Validate() error {
 	}
 	if c.TraefikNetwork == "" {
 		return fmt.Errorf("TRAEFIK_NETWORK cannot be empty")
+	}
+	if c.TemplatesDir == "" {
+		return fmt.Errorf("TEMPLATES_DIR cannot be empty")
 	}
 	return nil
 }

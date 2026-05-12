@@ -205,3 +205,44 @@ type UpsertAppBackupScheduleRequest struct {
 	IntervalMinutes int  `json:"interval_minutes"`
 	UploadToS3      bool `json:"upload_to_s3"`
 }
+
+// AppTemplateInput defines one input required or accepted by a template.
+type AppTemplateInput struct {
+	Name        string `json:"name"`
+	Label       string `json:"label"`
+	Type        string `json:"type"`
+	Required    bool   `json:"required"`
+	Default     string `json:"default,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// AppTemplate represents a provisionable app template.
+type AppTemplate struct {
+	ID             string                      `json:"id"`
+	Name           string                      `json:"name"`
+	Description    string                      `json:"description,omitempty"`
+	DeploymentType string                      `json:"deployment_type"`
+	BuildType      string                      `json:"build_type"`
+	ComposePath    string                      `json:"compose_path,omitempty"`
+	DockerfilePath string                      `json:"dockerfile_path,omitempty"`
+	Port           int                         `json:"port,omitempty"`
+	Inputs         []AppTemplateInput          `json:"inputs,omitempty"`
+	DefaultEnv     map[string]string           `json:"default_env,omitempty"`
+	Metadata       map[string]string           `json:"metadata,omitempty"`
+}
+
+// TemplateProvisionRequest provisions one app from a template.
+type TemplateProvisionRequest struct {
+	AppName   string            `json:"app_name"`
+	Domains   []string          `json:"domains,omitempty"`
+	Inputs    map[string]string `json:"inputs,omitempty"`
+	EnvVars   EnvVars           `json:"env_vars,omitempty"`
+	AutoDeploy bool             `json:"auto_deploy,omitempty"`
+}
+
+// TemplateProvisionResponse returns results of template provisioning.
+type TemplateProvisionResponse struct {
+	Message       string         `json:"message"`
+	App           *App           `json:"app"`
+	DeploymentLog *DeploymentLog `json:"deployment_log,omitempty"`
+}

@@ -120,6 +120,7 @@ func createDirectories(cfg *config.Config) error {
 		cfg.WorkspacesDir,
 		cfg.KeysDir,
 		cfg.LogsDir,
+		cfg.TemplatesDir,
 	}
 
 	for _, dir := range dirs {

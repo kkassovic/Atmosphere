@@ -1,0 +1,12 @@
+services:
+  superset:
+    image: apache/superset:latest
+    restart: unless-stopped
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+    command: ["/bin/sh", "-c", "superset db upgrade && superset init && /usr/bin/run-server.sh"]
+    volumes:
+      - superset_home:/app/superset_home
+
+volumes:
+  superset_home:

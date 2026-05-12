@@ -421,6 +421,49 @@ func (h *Handler) CheckBackupStorageHealth(w http.ResponseWriter, r *http.Reques
 	respondJSON(w, http.StatusOK, health)
 }
 
+// ListTemplates handles GET /api/v1/templates
+func (h *Handler) ListTemplates(w http.ResponseWriter, r *http.Request) {
+	templates, err := h.appService.ListTemplates()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, templates)
+}
+
+// GetTemplate handles GET /api/v1/templates/{id}
+func (h *Handler) GetTemplate(w http.ResponseWriter, r *http.Request) {
+	templateID := chi.URLParam(r, "id")
+
+	template, err := h.appService.GetTemplate(templateID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, template)
+}
+
+// ProvisionTemplate handles POST /api/v1/templates/{id}/provision
+func (h *Handler) ProvisionTemplate(w http.ResponseWriter, r *http.Request) {
+	templateID := chi.URLParam(r, "id")
+
+	var req models.TemplateProvisionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	resp, err := h.appService.ProvisionTemplate(templateID, &req)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, resp)
+}
+
 // Helper functions for responses
 
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {

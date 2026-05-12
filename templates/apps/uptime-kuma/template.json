@@ -1,0 +1,14 @@
+{
+  "id": "uptime-kuma",
+  "name": "Uptime Kuma",
+  "description": "Uptime monitoring dashboard",
+  "deployment_type": "manual",
+  "build_type": "compose",
+  "compose_path": "docker-compose.yml",
+  "port": 3001,
+  "inputs": [],
+  "default_env": {},
+  "metadata": {
+    "category": "monitoring"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "vaultwarden",
+  "name": "Vaultwarden",
+  "description": "Lightweight Bitwarden-compatible password manager",
+  "deployment_type": "manual",
+  "build_type": "compose",
+  "compose_path": "docker-compose.yml",
+  "port": 80,
+  "inputs": [
+    {
+      "name": "admin_token",
+      "label": "Admin Token",
+      "type": "secret",
+      "required": true
+    }
+  ],
+  "default_env": {
+    "ADMIN_TOKEN": "{{admin_token}}",
+    "SIGNUPS_ALLOWED": "false"
+  },
+  "metadata": {
+    "category": "security"
+  }
+}

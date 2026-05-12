@@ -1,0 +1,50 @@
+{
+  "id": "wordpress",
+  "name": "WordPress",
+  "description": "WordPress with MariaDB",
+  "deployment_type": "manual",
+  "build_type": "compose",
+  "compose_path": "docker-compose.yml",
+  "port": 80,
+  "inputs": [
+    {
+      "name": "db_name",
+      "label": "Database Name",
+      "type": "string",
+      "required": true,
+      "default": "wordpress"
+    },
+    {
+      "name": "db_user",
+      "label": "Database User",
+      "type": "string",
+      "required": true,
+      "default": "wordpress"
+    },
+    {
+      "name": "db_password",
+      "label": "Database Password",
+      "type": "secret",
+      "required": true
+    },
+    {
+      "name": "db_root_password",
+      "label": "Database Root Password",
+      "type": "secret",
+      "required": true
+    }
+  ],
+  "default_env": {
+    "WORDPRESS_DB_NAME": "{{db_name}}",
+    "WORDPRESS_DB_USER": "{{db_user}}",
+    "WORDPRESS_DB_PASSWORD": "{{db_password}}",
+    "WORDPRESS_DB_HOST": "db:3306",
+    "MYSQL_DATABASE": "{{db_name}}",
+    "MYSQL_USER": "{{db_user}}",
+    "MYSQL_PASSWORD": "{{db_password}}",
+    "MYSQL_ROOT_PASSWORD": "{{db_root_password}}"
+  },
+  "metadata": {
+    "category": "cms"
+  }
+}

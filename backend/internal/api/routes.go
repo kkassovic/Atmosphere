@@ -45,6 +45,11 @@ func NewRouter(appService *services.AppService) http.Handler {
 
 	// API routes
 	r.Route("/api/v1", func(r chi.Router) {
+		// Templates
+		r.Get("/templates", handler.ListTemplates)
+		r.Get("/templates/{id}", handler.GetTemplate)
+		r.Post("/templates/{id}/provision", handler.ProvisionTemplate)
+
 		// Apps
 		r.Get("/apps", handler.ListApps)
 		r.Post("/apps", handler.CreateApp)

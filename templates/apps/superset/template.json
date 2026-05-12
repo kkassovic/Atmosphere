@@ -1,0 +1,23 @@
+{
+  "id": "superset",
+  "name": "Apache Superset",
+  "description": "Business intelligence and data visualization platform",
+  "deployment_type": "manual",
+  "build_type": "compose",
+  "compose_path": "docker-compose.yml",
+  "port": 8088,
+  "inputs": [
+    {
+      "name": "secret_key",
+      "label": "Superset Secret Key",
+      "type": "secret",
+      "required": true
+    }
+  ],
+  "default_env": {
+    "SUPERSET_SECRET_KEY": "{{secret_key}}"
+  },
+  "metadata": {
+    "category": "analytics"
+  }
+}
