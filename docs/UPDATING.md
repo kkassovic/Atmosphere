@@ -28,10 +28,14 @@ cd ~/atmosphere/backend
 go build -o ./atmosphere ./cmd/atmosphere
 sudo install -m 0755 ./atmosphere /opt/atmosphere/atmosphere
 
-# 4. Restart service
+# 4. Sync template files used by the running service
+sudo mkdir -p /opt/atmosphere/templates/apps
+sudo cp -a ~/atmosphere/templates/apps/. /opt/atmosphere/templates/apps/
+
+# 5. Restart service
 sudo systemctl restart atmosphere
 
-# 5. Verify
+# 6. Verify
 sudo systemctl status atmosphere
 sudo journalctl -u atmosphere -n 50
 ```
@@ -170,6 +174,10 @@ sudo nano /opt/atmosphere/.env
 ### Step 7: Restart the Service
 
 ```bash
+# Sync templates used by systemd runtime path
+sudo mkdir -p /opt/atmosphere/templates/apps
+sudo cp -a ~/atmosphere/templates/apps/. /opt/atmosphere/templates/apps/
+
 # Restart Atmosphere service
 sudo systemctl restart atmosphere
 

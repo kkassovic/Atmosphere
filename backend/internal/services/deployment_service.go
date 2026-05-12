@@ -538,6 +538,11 @@ func (s *DeploymentService) CreateComposeCommand(ctx context.Context, workDir st
 			envMap[key] = value
 		}
 	}
+
+	// Apply app-level env vars persisted in Atmosphere.
+	for key, value := range app.EnvVars {
+		envMap[key] = value
+	}
 	
 	// Add Atmosphere-specific variables (highest priority)
 	envMap["ATMOSPHERE_APP"] = app.Name

@@ -83,6 +83,7 @@ Important for systemd deployments:
 
 - The running service reads `/opt/atmosphere/.env`.
 - If you edit `.env` in your repository checkout (for example `~/atmosphere/.env`), copy it to `/opt/atmosphere/.env` before restarting.
+- If you add or update app templates in your repository checkout, copy `~/atmosphere/templates/apps` into `/opt/atmosphere/templates/apps` before restarting.
 
 ```bash
 cd ~/atmosphere
@@ -90,6 +91,10 @@ cp .env.example .env
 nano .env
 
 sudo cp .env /opt/atmosphere/.env
+
+sudo mkdir -p /opt/atmosphere/templates/apps
+sudo cp -a ~/atmosphere/templates/apps/. /opt/atmosphere/templates/apps/
+
 sudo systemctl restart atmosphere
 ```
 

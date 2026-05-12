@@ -2,11 +2,27 @@ services:
   vaultwarden:
     image: vaultwarden/server:latest
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.entrypoints=websecure"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.tls=true"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.tls.certresolver=letsencrypt"
+      - "traefik.http.services.${ATMOSPHERE_APP}.loadbalancer.server.port=80"
     environment:
       ADMIN_TOKEN: ${ADMIN_TOKEN}
       SIGNUPS_ALLOWED: ${SIGNUPS_ALLOWED:-false}
     volumes:
       - vaultwarden_data:/data
+    networks:
+      - default
+      - traefik
 
 volumes:
   vaultwarden_data:
+
+networks:
+  default:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}
