@@ -2,11 +2,6 @@ services:
   cms-db:
     image: mariadb:11
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
@@ -22,8 +17,7 @@ services:
     image: ghcr.io/xibosignage/xibo-cms:latest
     restart: unless-stopped
     depends_on:
-      cms-db:
-        condition: service_healthy
+      - cms-db
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.${ATMOSPHERE_APP}.rule=Host(`${DOMAIN}`)"
