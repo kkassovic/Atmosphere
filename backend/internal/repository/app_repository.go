@@ -179,6 +179,135 @@ func (r *AppRepository) Delete(id int64) error {
 	return nil
 }
 
+// UpsertAppBackupSchedule creates or updates the backup schedule for one app.
+func (r *AppRepository) UpsertAppBackupSchedule(schedule *models.AppBackupSchedule) error {
+	query := `
+		INSERT INTO app_backup_schedules (
+			app_id, enabled, interval_minutes, upload_to_s3,
+			last_backup_id, last_run_at, next_run_at, last_status, last_error,
+			created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(app_id) DO UPDATE SET
+			enabled = excluded.enabled,
+			interval_minutes = excluded.interval_minutes,
+			upload_to_s3 = excluded.upload_to_s3,
+			last_backup_id = excluded.last_backup_id,
+			last_run_at = excluded.last_run_at,
+			next_run_at = excluded.next_run_at,
+			last_status = excluded.last_status,
+			last_error = excluded.last_error,
+			updated_at = excluded.updated_at
+	`
+
+	now := time.Now()
+	schedule.UpdatedAt = now
+	if schedule.CreatedAt.IsZero() {
+		schedule.CreatedAt = now
+	}
+
+	_, err := r.db.Exec(
+		query,
+		schedule.AppID,
+		schedule.Enabled,
+		schedule.IntervalMinutes,
+		schedule.UploadToS3,
+		schedule.LastBackupID,
+		schedule.LastRunAt,
+		schedule.NextRunAt,
+		schedule.LastStatus,
+		schedule.LastError,
+		schedule.CreatedAt,
+		schedule.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to upsert backup schedule: %w", err)
+	}
+
+	return nil
+}
+
+// GetAppBackupSchedule gets the backup schedule for one app.
+func (r *AppRepository) GetAppBackupSchedule(appID int64) (*models.AppBackupSchedule, error) {
+	query := `
+		SELECT id, app_id, enabled, interval_minutes, upload_to_s3,
+			last_backup_id, last_run_at, next_run_at, last_status, last_error,
+			created_at, updated_at
+		FROM app_backup_schedules
+		WHERE app_id = ?
+	`
+
+	schedule := &models.AppBackupSchedule{}
+	err := r.db.QueryRow(query, appID).Scan(
+		&schedule.ID,
+		&schedule.AppID,
+		&schedule.Enabled,
+		&schedule.IntervalMinutes,
+		&schedule.UploadToS3,
+		&schedule.LastBackupID,
+		&schedule.LastRunAt,
+		&schedule.NextRunAt,
+		&schedule.LastStatus,
+		&schedule.LastError,
+		&schedule.CreatedAt,
+		&schedule.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get backup schedule: %w", err)
+	}
+
+	return schedule, nil
+}
+
+// ListDueAppBackupSchedules returns enabled schedules that are due to run.
+func (r *AppRepository) ListDueAppBackupSchedules(now time.Time, limit int) ([]*models.AppBackupSchedule, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	query := `
+		SELECT id, app_id, enabled, interval_minutes, upload_to_s3,
+			last_backup_id, last_run_at, next_run_at, last_status, last_error,
+			created_at, updated_at
+		FROM app_backup_schedules
+		WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ?
+		ORDER BY next_run_at ASC
+		LIMIT ?
+	`
+
+	rows, err := r.db.Query(query, now, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list due backup schedules: %w", err)
+	}
+	defer rows.Close()
+
+	schedules := []*models.AppBackupSchedule{}
+	for rows.Next() {
+		schedule := &models.AppBackupSchedule{}
+		if err := rows.Scan(
+			&schedule.ID,
+			&schedule.AppID,
+			&schedule.Enabled,
+			&schedule.IntervalMinutes,
+			&schedule.UploadToS3,
+			&schedule.LastBackupID,
+			&schedule.LastRunAt,
+			&schedule.NextRunAt,
+			&schedule.LastStatus,
+			&schedule.LastError,
+			&schedule.CreatedAt,
+			&schedule.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan backup schedule: %w", err)
+		}
+		schedules = append(schedules, schedule)
+	}
+
+	return schedules, nil
+}
+
 // CreateDeploymentLog creates a deployment log entry
 func (r *AppRepository) CreateDeploymentLog(log *models.DeploymentLog) error {
 	query := `

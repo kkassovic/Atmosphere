@@ -226,6 +226,38 @@ func (h *Handler) DeleteAppBackup(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"message": "Backup deleted successfully"})
 }
 
+// GetAppBackupSchedule handles GET /api/v1/apps/{name}/backup-schedule
+func (h *Handler) GetAppBackupSchedule(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	schedule, err := h.appService.GetAppBackupSchedule(name)
+	if err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, schedule)
+}
+
+// UpsertAppBackupSchedule handles PUT /api/v1/apps/{name}/backup-schedule
+func (h *Handler) UpsertAppBackupSchedule(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	var req models.UpsertAppBackupScheduleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	schedule, err := h.appService.UpsertAppBackupSchedule(name, &req)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, schedule)
+}
+
 // StartAppRestore handles POST /api/v1/apps/{name}/restores
 func (h *Handler) StartAppRestore(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")

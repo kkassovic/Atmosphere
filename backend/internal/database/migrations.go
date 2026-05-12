@@ -12,6 +12,7 @@ func RunMigrations(db *sql.DB) error {
 		createDeploymentLogsTable,
 		createAppBackupsTable,
 		createAppRestoresTable,
+		createAppBackupSchedulesTable,
 		createIndexes,
 	}
 
@@ -97,6 +98,24 @@ CREATE TABLE IF NOT EXISTS app_restores (
 );
 `
 
+const createAppBackupSchedulesTable = `
+CREATE TABLE IF NOT EXISTS app_backup_schedules (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	app_id INTEGER NOT NULL UNIQUE,
+	enabled BOOLEAN NOT NULL DEFAULT 0,
+	interval_minutes INTEGER NOT NULL DEFAULT 1440,
+	upload_to_s3 BOOLEAN NOT NULL DEFAULT 0,
+	last_backup_id TEXT DEFAULT '',
+	last_run_at DATETIME,
+	next_run_at DATETIME,
+	last_status TEXT DEFAULT '',
+	last_error TEXT DEFAULT '',
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE
+);
+`
+
 const createIndexes = `
 CREATE INDEX IF NOT EXISTS idx_apps_name ON apps(name);
 CREATE INDEX IF NOT EXISTS idx_apps_status ON apps(status);
@@ -106,6 +125,7 @@ CREATE INDEX IF NOT EXISTS idx_app_backups_app_id ON app_backups(app_id);
 CREATE INDEX IF NOT EXISTS idx_app_backups_started_at ON app_backups(started_at);
 CREATE INDEX IF NOT EXISTS idx_app_restores_app_id ON app_restores(app_id);
 CREATE INDEX IF NOT EXISTS idx_app_restores_started_at ON app_restores(started_at);
+CREATE INDEX IF NOT EXISTS idx_app_backup_schedules_enabled_next_run_at ON app_backup_schedules(enabled, next_run_at);
 `
 
 // migrateDomainToDomainsFunc handles the migration from domain (string) to domains (JSON array)

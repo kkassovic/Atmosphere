@@ -1,12 +1,7 @@
 package api
 
 import (
-	"atmosphere/internal/config"
-	"atmosphere/internal/repository"
 	"atmosphere/internal/services"
-	"atmosphere/internal/storage"
-	"database/sql"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -16,7 +11,7 @@ import (
 )
 
 // NewRouter creates and configures the HTTP router
-func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
+func NewRouter(appService *services.AppService) http.Handler {
 	r := chi.NewRouter()
 
 	// Middleware
@@ -36,36 +31,9 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		MaxAge:           300,
 	}))
 
-	// Initialize services
-	appRepo := repository.NewAppRepository(db)
-	dockerService, err := services.NewDockerService()
-	if err != nil {
-		panic(err) // Fatal error if Docker is not available
+	if appService == nil {
+		panic("app service is required")
 	}
-	deploymentService := services.NewDeploymentService(cfg, dockerService)
-
-	// Initialize backup storage
-	storageConfig := &storage.StorageConfig{
-		LocalBasePath: cfg.LogsDir,
-	}
-	if cfg.IsS3Enabled() {
-		storageConfig.Type = "s3"
-		storageConfig.S3Endpoint = cfg.S3Endpoint
-		storageConfig.S3Bucket = cfg.S3Bucket
-		storageConfig.S3Region = cfg.S3Region
-		storageConfig.S3AccessKey = cfg.S3AccessKey
-		storageConfig.S3SecretKey = cfg.S3SecretKey
-		storageConfig.S3PathPrefix = cfg.S3PathPrefix
-	}
-
-	backupStorage, err := storage.NewBackupStorage(storageConfig)
-	if err != nil {
-		fmt.Printf("Warning: failed to initialize backup storage: %v\n", err)
-		// Fall back to local storage
-		backupStorage, _ = storage.NewLocalStorage(cfg.LogsDir)
-	}
-
-	appService := services.NewAppService(appRepo, cfg, deploymentService, backupStorage)
 
 	// Initialize handler
 	handler := NewHandler(appService)
@@ -97,6 +65,8 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		r.Get("/apps/{name}/backups", handler.ListAppBackups)
 		r.Get("/apps/{name}/backups/{backupID}", handler.GetAppBackup)
 		r.Delete("/apps/{name}/backups/{backupID}", handler.DeleteAppBackup)
+		r.Get("/apps/{name}/backup-schedule", handler.GetAppBackupSchedule)
+		r.Put("/apps/{name}/backup-schedule", handler.UpsertAppBackupSchedule)
 		r.Post("/apps/{name}/restores", handler.StartAppRestore)
 		r.Get("/apps/{name}/restores/{restoreID}", handler.GetAppRestore)
 

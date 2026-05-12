@@ -4,6 +4,9 @@ import (
 	"atmosphere/internal/api"
 	"atmosphere/internal/config"
 	"atmosphere/internal/database"
+	"atmosphere/internal/repository"
+	"atmosphere/internal/services"
+	"atmosphere/internal/storage"
 	"context"
 	"fmt"
 	"log"
@@ -40,8 +43,34 @@ func main() {
 		log.Fatalf("Failed to create directories: %v", err)
 	}
 
+	appRepo := repository.NewAppRepository(db)
+	dockerService, err := services.NewDockerService()
+	if err != nil {
+		log.Fatalf("Failed to initialize Docker service: %v", err)
+	}
+	deploymentService := services.NewDeploymentService(cfg, dockerService)
+
+	storageConfig := &storage.StorageConfig{LocalBasePath: cfg.LogsDir}
+	if cfg.IsS3Enabled() {
+		storageConfig.Type = "s3"
+		storageConfig.S3Endpoint = cfg.S3Endpoint
+		storageConfig.S3Bucket = cfg.S3Bucket
+		storageConfig.S3Region = cfg.S3Region
+		storageConfig.S3AccessKey = cfg.S3AccessKey
+		storageConfig.S3SecretKey = cfg.S3SecretKey
+		storageConfig.S3PathPrefix = cfg.S3PathPrefix
+	}
+	backupStorage, err := storage.NewBackupStorage(storageConfig)
+	if err != nil {
+		log.Printf("Warning: failed to initialize backup storage: %v", err)
+		backupStorage, _ = storage.NewLocalStorage(cfg.LogsDir)
+	}
+
+	appService := services.NewAppService(appRepo, cfg, deploymentService, backupStorage)
+	backupScheduler := services.NewBackupScheduler(appRepo, appService, cfg)
+
 	// Initialize router
-	router := api.NewRouter(db, cfg)
+	router := api.NewRouter(appService)
 
 	// Create HTTP server
 	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
@@ -61,12 +90,18 @@ func main() {
 		}
 	}()
 
+	// Start backup scheduler in background.
+	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
+	go backupScheduler.Run(schedulerCtx)
+
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Println("Shutting down server...")
+	schedulerCancel()
+	backupScheduler.Stop()
 
 	// Graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

@@ -182,3 +182,26 @@ type CreateAppRestoreRequest struct {
 type CreateAppBackupRequest struct {
 	UploadToS3 bool `json:"upload_to_s3,omitempty"` // Upload to S3 after creating backup
 }
+
+// AppBackupSchedule represents a recurring backup schedule for one app.
+type AppBackupSchedule struct {
+	ID             int64      `json:"id"`
+	AppID          int64      `json:"app_id"`
+	Enabled        bool       `json:"enabled"`
+	IntervalMinutes int        `json:"interval_minutes"`
+	UploadToS3     bool       `json:"upload_to_s3"`
+	LastBackupID   string     `json:"last_backup_id,omitempty"`
+	LastRunAt      *time.Time `json:"last_run_at,omitempty"`
+	NextRunAt      *time.Time `json:"next_run_at,omitempty"`
+	LastStatus     string     `json:"last_status,omitempty"`
+	LastError      string     `json:"last_error,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+// UpsertAppBackupScheduleRequest configures one app's recurring backup schedule.
+type UpsertAppBackupScheduleRequest struct {
+	Enabled         bool `json:"enabled"`
+	IntervalMinutes int  `json:"interval_minutes"`
+	UploadToS3      bool `json:"upload_to_s3"`
+}

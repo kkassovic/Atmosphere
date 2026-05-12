@@ -32,6 +32,73 @@ func NewAppService(repo *repository.AppRepository, cfg *config.Config, deploymen
 	}
 }
 
+// GetAppBackupSchedule retrieves the backup schedule for one app.
+func (s *AppService) GetAppBackupSchedule(name string) (*models.AppBackupSchedule, error) {
+	app, err := s.GetApp(name)
+	if err != nil {
+		return nil, err
+	}
+
+	schedule, err := s.repo.GetAppBackupSchedule(app.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get backup schedule: %w", err)
+	}
+	if schedule == nil {
+		return nil, fmt.Errorf("backup schedule not found")
+	}
+
+	return schedule, nil
+}
+
+// UpsertAppBackupSchedule creates or updates the recurring backup schedule for one app.
+func (s *AppService) UpsertAppBackupSchedule(name string, req *models.UpsertAppBackupScheduleRequest) (*models.AppBackupSchedule, error) {
+	app, err := s.GetApp(name)
+	if err != nil {
+		return nil, err
+	}
+	if req.IntervalMinutes <= 0 {
+		return nil, fmt.Errorf("interval_minutes must be greater than zero")
+	}
+
+	now := time.Now().UTC()
+	nextRunAt := now.Add(time.Duration(req.IntervalMinutes) * time.Minute)
+	existing, err := s.repo.GetAppBackupSchedule(app.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load backup schedule: %w", err)
+	}
+
+	schedule := &models.AppBackupSchedule{
+		AppID:           app.ID,
+		Enabled:         req.Enabled,
+		IntervalMinutes: req.IntervalMinutes,
+		UploadToS3:      req.UploadToS3,
+	}
+	if existing != nil {
+		schedule.ID = existing.ID
+		schedule.CreatedAt = existing.CreatedAt
+		schedule.LastBackupID = existing.LastBackupID
+		schedule.LastRunAt = existing.LastRunAt
+		schedule.LastStatus = existing.LastStatus
+		schedule.LastError = existing.LastError
+	}
+	if req.Enabled {
+		schedule.NextRunAt = &nextRunAt
+	} else if existing != nil {
+		schedule.NextRunAt = existing.NextRunAt
+	}
+
+	if err := s.repo.UpsertAppBackupSchedule(schedule); err != nil {
+		return nil, fmt.Errorf("failed to save backup schedule: %w", err)
+	}
+
+	updated, err := s.repo.GetAppBackupSchedule(app.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reload backup schedule: %w", err)
+	}
+
+	return updated, nil
+}
+
 // CreateApp creates a new app
 func (s *AppService) CreateApp(req *models.CreateAppRequest) (*models.App, error) {
 	// Validate request
