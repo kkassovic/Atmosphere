@@ -9,6 +9,7 @@
   "inputs": [],
   "default_env": {},
   "metadata": {
-    "category": "monitoring"
+    "category": "monitoring",
+    "sample_provision_curl": "curl -X POST http://localhost:3000/api/v1/templates/uptime-kuma/provision -H \"Content-Type: application/json\" -d '{\"app_name\":\"my-uptime-kuma\",\"domains\":[\"status.example.com\"],\"inputs\":{},\"env_vars\":{},\"auto_deploy\":true}'"
   }
 }

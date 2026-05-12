@@ -45,6 +45,7 @@
     "MYSQL_ROOT_PASSWORD": "{{db_root_password}}"
   },
   "metadata": {
-    "category": "cms"
+    "category": "cms",
+    "sample_provision_curl": "curl -X POST http://localhost:3000/api/v1/templates/wordpress/provision -H \"Content-Type: application/json\" -d '{\"app_name\":\"my-wordpress\",\"domains\":[\"wp.example.com\"],\"inputs\":{\"db_name\":\"wordpress\",\"db_user\":\"wordpress\",\"db_password\":\"change-me\",\"db_root_password\":\"change-me-root\"},\"env_vars\":{},\"auto_deploy\":true}'"
   }
 }

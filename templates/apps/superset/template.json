@@ -18,6 +18,7 @@
     "SUPERSET_SECRET_KEY": "{{secret_key}}"
   },
   "metadata": {
-    "category": "analytics"
+    "category": "analytics",
+    "sample_provision_curl": "curl -X POST http://localhost:3000/api/v1/templates/superset/provision -H \"Content-Type: application/json\" -d '{\"app_name\":\"my-superset\",\"domains\":[\"superset.example.com\"],\"inputs\":{\"secret_key\":\"change-me-secret-key\"},\"env_vars\":{},\"auto_deploy\":true}'"
   }
 }

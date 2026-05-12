@@ -19,6 +19,7 @@
     "SIGNUPS_ALLOWED": "false"
   },
   "metadata": {
-    "category": "security"
+    "category": "security",
+    "sample_provision_curl": "curl -X POST http://localhost:3000/api/v1/templates/vaultwarden/provision -H \"Content-Type: application/json\" -d '{\"app_name\":\"my-vaultwarden\",\"domains\":[\"vault.example.com\"],\"inputs\":{\"admin_token\":\"change-me-admin-token\"},\"env_vars\":{},\"auto_deploy\":true}'"
   }
 }
