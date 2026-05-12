@@ -216,6 +216,12 @@ func (s *AppService) GetAppRestore(name, restoreID string) (*models.AppRestore, 
 		return nil, fmt.Errorf("failed to get app restore: %w", err)
 	}
 	if restore == nil {
+		restore, err = s.repo.GetLatestAppRestoreByBackupID(app.ID, restoreID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get app restore by backup id: %w", err)
+		}
+	}
+	if restore == nil {
 		return nil, fmt.Errorf("restore not found")
 	}
 

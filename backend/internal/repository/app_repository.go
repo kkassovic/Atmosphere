@@ -487,3 +487,34 @@ func (r *AppRepository) GetAppRestoreByRestoreID(appID int64, restoreID string) 
 
 	return restore, nil
 }
+
+// GetLatestAppRestoreByBackupID gets the latest restore by app id and backup id.
+func (r *AppRepository) GetLatestAppRestoreByBackupID(appID int64, backupID string) (*models.AppRestore, error) {
+	query := `
+		SELECT id, restore_id, app_id, backup_id, status, log, started_at, completed_at
+		FROM app_restores
+		WHERE app_id = ? AND backup_id = ?
+		ORDER BY started_at DESC, id DESC
+		LIMIT 1
+	`
+
+	restore := &models.AppRestore{}
+	err := r.db.QueryRow(query, appID, backupID).Scan(
+		&restore.ID,
+		&restore.RestoreID,
+		&restore.AppID,
+		&restore.BackupID,
+		&restore.Status,
+		&restore.Log,
+		&restore.StartedAt,
+		&restore.CompletedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest app restore by backup id: %w", err)
+	}
+
+	return restore, nil
+}

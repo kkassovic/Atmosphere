@@ -169,10 +169,23 @@ func (s *DockerService) EnsureVolume(ctx context.Context, volumeName string) err
 
 // GetVolumeNamesByApp returns unique named Docker volume names mounted by app containers.
 func (s *DockerService) GetVolumeNamesByApp(ctx context.Context, appName string) ([]string, error) {
-	containers, err := s.GetContainersByLabel(ctx, "atmosphere.app", appName)
+	containersByAppLabel, err := s.GetContainersByLabel(ctx, "atmosphere.app", appName)
 	if err != nil {
 		return nil, err
 	}
+
+	projectName := fmt.Sprintf("atmosphere-%s", appName)
+	projectFilter := filters.NewArgs()
+	projectFilter.Add("label", fmt.Sprintf("com.docker.compose.project=%s", projectName))
+	containersByComposeProject, err := s.client.ContainerList(ctx, container.ListOptions{
+		All:     true,
+		Filters: projectFilter,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list compose project containers: %w", err)
+	}
+
+	containers := append(containersByAppLabel, containersByComposeProject...)
 
 	volumeMap := make(map[string]struct{})
 	for _, c := range containers {
