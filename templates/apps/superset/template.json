@@ -12,13 +12,52 @@
       "label": "Superset Secret Key",
       "type": "secret",
       "required": true
+    },
+    {
+      "name": "admin_username",
+      "label": "Admin Username",
+      "type": "string",
+      "required": true,
+      "default": "admin"
+    },
+    {
+      "name": "admin_password",
+      "label": "Admin Password",
+      "type": "secret",
+      "required": true
+    },
+    {
+      "name": "admin_email",
+      "label": "Admin Email",
+      "type": "string",
+      "required": true,
+      "default": "admin@example.com"
+    },
+    {
+      "name": "admin_firstname",
+      "label": "Admin First Name",
+      "type": "string",
+      "required": false,
+      "default": "Admin"
+    },
+    {
+      "name": "admin_lastname",
+      "label": "Admin Last Name",
+      "type": "string",
+      "required": false,
+      "default": "User"
     }
   ],
   "default_env": {
-    "SUPERSET_SECRET_KEY": "{{secret_key}}"
+    "SUPERSET_SECRET_KEY": "{{secret_key}}",
+    "SUPERSET_ADMIN_USERNAME": "{{admin_username}}",
+    "SUPERSET_ADMIN_PASSWORD": "{{admin_password}}",
+    "SUPERSET_ADMIN_EMAIL": "{{admin_email}}",
+    "SUPERSET_ADMIN_FIRSTNAME": "{{admin_firstname}}",
+    "SUPERSET_ADMIN_LASTNAME": "{{admin_lastname}}"
   },
   "metadata": {
     "category": "analytics",
-    "sample_provision_curl": "curl -X POST http://localhost:3000/api/v1/templates/superset/provision -H \"Content-Type: application/json\" -d '{\"app_name\":\"my-superset\",\"domains\":[\"superset.example.com\"],\"inputs\":{\"secret_key\":\"change-me-secret-key\"},\"env_vars\":{},\"auto_deploy\":true}'"
+    "sample_provision_curl": "curl -X POST http://localhost:3000/api/v1/templates/superset/provision -H \"Content-Type: application/json\" -d '{\"app_name\":\"my-superset\",\"domains\":[\"superset.example.com\"],\"inputs\":{\"secret_key\":\"change-me-secret-key\",\"admin_username\":\"admin\",\"admin_password\":\"change-me-admin-password\",\"admin_email\":\"admin@example.com\"},\"env_vars\":{},\"auto_deploy\":true}'"
   }
 }

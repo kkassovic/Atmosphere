@@ -1,0 +1,71 @@
+{
+  "id": "xibo",
+  "name": "Xibo",
+  "description": "Open source digital signage CMS",
+  "deployment_type": "manual",
+  "build_type": "compose",
+  "compose_path": "docker-compose.yml",
+  "port": 80,
+  "inputs": [
+    {
+      "name": "db_name",
+      "label": "Database Name",
+      "type": "string",
+      "required": true,
+      "default": "cms"
+    },
+    {
+      "name": "db_user",
+      "label": "Database User",
+      "type": "string",
+      "required": true,
+      "default": "xibo"
+    },
+    {
+      "name": "db_password",
+      "label": "Database Password",
+      "type": "secret",
+      "required": true
+    },
+    {
+      "name": "db_root_password",
+      "label": "Database Root Password",
+      "type": "secret",
+      "required": true
+    },
+    {
+      "name": "cms_key",
+      "label": "CMS Key",
+      "type": "secret",
+      "required": true
+    },
+    {
+      "name": "cms_salt",
+      "label": "CMS Salt",
+      "type": "secret",
+      "required": true
+    },
+    {
+      "name": "tz",
+      "label": "Timezone",
+      "type": "string",
+      "required": false,
+      "default": "UTC"
+    }
+  ],
+  "default_env": {
+    "MYSQL_DATABASE": "{{db_name}}",
+    "MYSQL_USER": "{{db_user}}",
+    "MYSQL_PASSWORD": "{{db_password}}",
+    "MYSQL_ROOT_PASSWORD": "{{db_root_password}}",
+    "CMS_SERVER_NAME": "{{domain}}",
+    "CMS_USE_HTTPS": "true",
+    "CMS_KEY": "{{cms_key}}",
+    "CMS_SALT": "{{cms_salt}}",
+    "TZ": "{{tz}}"
+  },
+  "metadata": {
+    "category": "digital-signage",
+    "sample_provision_curl": "curl -X POST http://localhost:3000/api/v1/templates/xibo/provision -H \"Content-Type: application/json\" -d '{\"app_name\":\"my-xibo\",\"domains\":[\"xibo.example.com\"],\"inputs\":{\"db_name\":\"cms\",\"db_user\":\"xibo\",\"db_password\":\"change-me-db\",\"db_root_password\":\"change-me-root\",\"cms_key\":\"change-me-cms-key\",\"cms_salt\":\"change-me-cms-salt\",\"tz\":\"UTC\"},\"env_vars\":{},\"auto_deploy\":true}'"
+  }
+}

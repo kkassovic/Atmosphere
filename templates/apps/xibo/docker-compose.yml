@@ -1,0 +1,56 @@
+services:
+  cms-db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - xibo_db_data:/var/lib/mysql
+    networks:
+      - default
+
+  cms-web:
+    image: ghcr.io/xibosignage/xibo-cms:latest
+    restart: unless-stopped
+    depends_on:
+      - cms-db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.entrypoints=websecure"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.tls=true"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.tls.certresolver=letsencrypt"
+      - "traefik.http.services.${ATMOSPHERE_APP}.loadbalancer.server.port=80"
+    environment:
+      CMS_SERVER_NAME: ${CMS_SERVER_NAME}
+      CMS_USE_HTTPS: ${CMS_USE_HTTPS:-true}
+      CMS_KEY: ${CMS_KEY}
+      CMS_SALT: ${CMS_SALT}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      CMS_DB_HOST: cms-db
+      TZ: ${TZ:-UTC}
+    volumes:
+      - xibo_cms_library:/var/www/cms/library
+      - xibo_cms_custom:/var/www/cms/custom
+      - xibo_cms_backup:/var/www/backup
+    networks:
+      - default
+      - traefik
+
+volumes:
+  xibo_db_data:
+  xibo_cms_library:
+  xibo_cms_custom:
+  xibo_cms_backup:
+
+networks:
+  default:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}

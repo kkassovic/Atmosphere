@@ -11,7 +11,12 @@ services:
       - "traefik.http.services.${ATMOSPHERE_APP}.loadbalancer.server.port=8088"
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
-    command: ["/bin/sh", "-c", "superset db upgrade && superset init && /usr/bin/run-server.sh"]
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD}
+      SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@example.com}
+      SUPERSET_ADMIN_FIRSTNAME: ${SUPERSET_ADMIN_FIRSTNAME:-Admin}
+      SUPERSET_ADMIN_LASTNAME: ${SUPERSET_ADMIN_LASTNAME:-User}
+    command: ["/bin/sh", "-c", "superset db upgrade && superset fab create-admin --username \"$${SUPERSET_ADMIN_USERNAME}\" --firstname \"$${SUPERSET_ADMIN_FIRSTNAME}\" --lastname \"$${SUPERSET_ADMIN_LASTNAME}\" --email \"$${SUPERSET_ADMIN_EMAIL}\" --password \"$${SUPERSET_ADMIN_PASSWORD}\" || true && superset init && /usr/bin/run-server.sh"]
     volumes:
       - superset_home:/app/superset_home
     networks:
