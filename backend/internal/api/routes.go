@@ -56,6 +56,7 @@ func NewRouter(appService *services.AppService) http.Handler {
 		r.Get("/apps/{name}", handler.GetApp)
 		r.Put("/apps/{name}", handler.UpdateApp)
 		r.Delete("/apps/{name}", handler.DeleteApp)
+		r.Post("/apps/{name}/destroy", handler.DestroyApp)
 
 		// Deployment actions
 		r.Post("/apps/{name}/deploy", handler.DeployApp)

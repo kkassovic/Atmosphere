@@ -167,6 +167,19 @@ func (s *DockerService) EnsureVolume(ctx context.Context, volumeName string) err
 	return nil
 }
 
+// RemoveVolume removes a Docker volume and its data.
+func (s *DockerService) RemoveVolume(ctx context.Context, volumeName string) error {
+	if volumeName == "" {
+		return fmt.Errorf("volume name is required")
+	}
+
+	if err := s.client.VolumeRemove(ctx, volumeName, true); err != nil {
+		return fmt.Errorf("failed to remove volume %s: %w", volumeName, err)
+	}
+
+	return nil
+}
+
 // GetVolumeNamesByApp returns unique named Docker volume names mounted by app containers.
 func (s *DockerService) GetVolumeNamesByApp(ctx context.Context, appName string) ([]string, error) {
 	containersByAppLabel, err := s.GetContainersByLabel(ctx, "atmosphere.app", appName)

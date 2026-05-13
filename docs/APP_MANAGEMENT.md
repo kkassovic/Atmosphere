@@ -509,6 +509,32 @@ Remove workspace directory manually:
 rm -rf /opt/atmosphere/workspaces/my-app
 ```
 
+### Destroy an App (Wipe Data, Keep Backups)
+
+Use destroy when you want to wipe runtime state and persistent app data but keep existing backups:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/apps/my-app/destroy
+```
+
+**Response:**
+```json
+{
+  "message": "App destroyed successfully (backups preserved)"
+}
+```
+
+**What destroy wipes:**
+- ✅ Containers removed
+- ✅ Docker volumes removed (persistent data wiped)
+- ✅ Workspace directory removed
+- ✅ SSH deployment key removed
+- ✅ Deployment logs removed
+- ✅ Restore history removed
+- ✅ Backup schedule removed
+- ✅ App runtime configuration reset
+- ✅ Backup artifacts and backup records preserved
+
 ### Before Deleting
 
 **Consider:**

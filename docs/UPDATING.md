@@ -17,16 +17,28 @@ This guide explains how to update your Atmosphere installation to the latest ver
 For experienced users who just need the commands:
 
 ```bash
+# 0. Use built-in update script (recommended)
+cd ~/atmosphere
+sudo chmod +x install/update.sh
+sudo ./install/update.sh
+```
+
+Or run manual steps:
+
+```bash
 # 1. Navigate to source directory
 cd ~/atmosphere
 
 # 2. Pull latest changes
 git pull origin main
 
-# 3. Rebuild binary to correct location
+# 3. Rebuild binaries to correct location
 cd ~/atmosphere/backend
 go build -o ./atmosphere ./cmd/atmosphere
+go build -o ./atmosphere-cli ./cmd/atmosphere-cli
 sudo install -m 0755 ./atmosphere /opt/atmosphere/atmosphere
+sudo install -m 0755 ./atmosphere-cli /opt/atmosphere/atmosphere-cli
+sudo ln -sf /opt/atmosphere/atmosphere-cli /usr/local/bin/atmosphere-cli
 
 # 4. Sync template files used by the running service
 sudo mkdir -p /opt/atmosphere/templates/apps
@@ -130,7 +142,7 @@ go mod download
 go mod tidy
 ```
 
-### Step 5: Rebuild the Binary
+### Step 5: Rebuild the Binaries
 
 **Critical:** Build to the correct location!
 
@@ -140,10 +152,14 @@ The service runs from `/opt/atmosphere/atmosphere` (NOT `/usr/local/bin/atmosphe
 # Build and install to correct location (from backend directory)
 cd ~/atmosphere/backend
 go build -o ./atmosphere ./cmd/atmosphere
+go build -o ./atmosphere-cli ./cmd/atmosphere-cli
 sudo install -m 0755 ./atmosphere /opt/atmosphere/atmosphere
+sudo install -m 0755 ./atmosphere-cli /opt/atmosphere/atmosphere-cli
+sudo ln -sf /opt/atmosphere/atmosphere-cli /usr/local/bin/atmosphere-cli
 
-# Verify binary was created
+# Verify binaries were created
 ls -lh /opt/atmosphere/atmosphere
+ls -lh /opt/atmosphere/atmosphere-cli
 
 # Check binary info
 file /opt/atmosphere/atmosphere
@@ -430,7 +446,7 @@ Before updating:
 During update:
 - [ ] Pull latest code: `git pull origin main`
 - [ ] Check for new dependencies: `go mod download`
-- [ ] Build to correct location: `/opt/atmosphere/atmosphere`
+- [ ] Build to correct location: `/opt/atmosphere/atmosphere` and `/opt/atmosphere/atmosphere-cli`
 - [ ] Update `.env` with new variables (if any)
 - [ ] Restart service: `systemctl restart atmosphere`
 
@@ -493,12 +509,15 @@ fi
 
 # Backup
 cp /opt/atmosphere/atmosphere /opt/atmosphere/atmosphere.backup.$(date +%Y%m%d-%H%M%S)
+cp /opt/atmosphere/atmosphere-cli /opt/atmosphere/atmosphere-cli.backup.$(date +%Y%m%d-%H%M%S)
 cp /opt/atmosphere/atmosphere.db /opt/atmosphere/atmosphere.db.backup.$(date +%Y%m%d-%H%M%S)
 
 # Update
 git pull origin main
 cd ~/atmosphere/backend
 go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
+go build -o /opt/atmosphere/atmosphere-cli ./cmd/atmosphere-cli
+ln -sf /opt/atmosphere/atmosphere-cli /usr/local/bin/atmosphere-cli
 
 # Restart
 systemctl restart atmosphere
@@ -510,6 +529,7 @@ if systemctl is-active --quiet atmosphere; then
 else
     echo "$(date): Update failed, rolling back" >> "$LOG"
     cp /opt/atmosphere/atmosphere.backup.* /opt/atmosphere/atmosphere
+   cp /opt/atmosphere/atmosphere-cli.backup.* /opt/atmosphere/atmosphere-cli
     systemctl restart atmosphere
     exit 1
 fi
@@ -552,6 +572,8 @@ cd ~/atmosphere
 git pull origin main
 cd backend
 go build -o /opt/atmosphere/atmosphere ./cmd/atmosphere
+go build -o /opt/atmosphere/atmosphere-cli ./cmd/atmosphere-cli
+sudo ln -sf /opt/atmosphere/atmosphere-cli /usr/local/bin/atmosphere-cli
 sudo systemctl restart atmosphere
 ```
 

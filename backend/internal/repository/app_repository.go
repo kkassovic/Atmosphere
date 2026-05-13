@@ -179,6 +179,33 @@ func (r *AppRepository) Delete(id int64) error {
 	return nil
 }
 
+// DeleteDeploymentLogsForApp removes all deployment logs for one app.
+func (r *AppRepository) DeleteDeploymentLogsForApp(appID int64) error {
+	query := `DELETE FROM deployment_logs WHERE app_id = ?`
+	if _, err := r.db.Exec(query, appID); err != nil {
+		return fmt.Errorf("failed to delete deployment logs: %w", err)
+	}
+	return nil
+}
+
+// DeleteAppRestoresForApp removes all restore history records for one app.
+func (r *AppRepository) DeleteAppRestoresForApp(appID int64) error {
+	query := `DELETE FROM app_restores WHERE app_id = ?`
+	if _, err := r.db.Exec(query, appID); err != nil {
+		return fmt.Errorf("failed to delete app restores: %w", err)
+	}
+	return nil
+}
+
+// DeleteAppBackupScheduleForApp removes backup schedule configuration for one app.
+func (r *AppRepository) DeleteAppBackupScheduleForApp(appID int64) error {
+	query := `DELETE FROM app_backup_schedules WHERE app_id = ?`
+	if _, err := r.db.Exec(query, appID); err != nil {
+		return fmt.Errorf("failed to delete app backup schedule: %w", err)
+	}
+	return nil
+}
+
 // UpsertAppBackupSchedule creates or updates the backup schedule for one app.
 func (r *AppRepository) UpsertAppBackupSchedule(schedule *models.AppBackupSchedule) error {
 	query := `

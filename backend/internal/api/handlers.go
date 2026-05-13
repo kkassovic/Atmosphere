@@ -97,6 +97,18 @@ func (h *Handler) DeleteApp(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"message": "App deleted successfully"})
 }
 
+// DestroyApp handles POST /api/v1/apps/{name}/destroy
+func (h *Handler) DestroyApp(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	if err := h.appService.DestroyApp(name); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"message": "App destroyed successfully (backups preserved)"})
+}
+
 // DeployApp handles POST /api/v1/apps/{name}/deploy
 func (h *Handler) DeployApp(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")

@@ -251,7 +251,7 @@ if [ -d "$PROJECT_ROOT/backend" ]; then
 fi
 
 if [ -n "$BACKEND_DIR" ]; then
-    echo -e "${YELLOW}Building atmosphere...${NC}"
+  echo -e "${YELLOW}Building atmosphere binaries...${NC}"
     
     # Install Go if not present
     if ! command -v go &> /dev/null; then
@@ -291,7 +291,7 @@ if [ -n "$BACKEND_DIR" ]; then
         echo -e "${GREEN}✓ Go already installed: $(go version)${NC}"
     fi
     
-    # Build atmosphere
+    # Build atmosphere binaries
     echo -e "${YELLOW}Downloading Go dependencies...${NC}"
     cd "$BACKEND_DIR"
     
@@ -309,27 +309,38 @@ if [ -n "$BACKEND_DIR" ]; then
     echo -e "${YELLOW}Installing build tools...${NC}"
     apt-get install -y -qq build-essential
     
-    # Build binary with CGO enabled (required for go-sqlite3)
-    echo -e "${YELLOW}Compiling atmosphere binary...${NC}"
+    # Build binaries with CGO enabled (required for go-sqlite3)
+    echo -e "${YELLOW}Compiling atmosphere server binary...${NC}"
     CGO_ENABLED=1 go build -o $INSTALL_DIR/atmosphere ./cmd/atmosphere
-    BUILD_STATUS=$?
+    SERVER_BUILD_STATUS=$?
+
+    echo -e "${YELLOW}Compiling atmosphere CLI binary...${NC}"
+    CGO_ENABLED=1 go build -o $INSTALL_DIR/atmosphere-cli ./cmd/atmosphere-cli
+    CLI_BUILD_STATUS=$?
     
     cd - > /dev/null
     
-    if [ $BUILD_STATUS -eq 0 ]; then
-        # Make binary executable
+    if [ $SERVER_BUILD_STATUS -eq 0 ] && [ $CLI_BUILD_STATUS -eq 0 ]; then
+      # Make binaries executable
         chmod +x $INSTALL_DIR/atmosphere
-        echo -e "${GREEN}✓ atmosphere built successfully${NC}"
+      chmod +x $INSTALL_DIR/atmosphere-cli
+
+      # Expose CLI on PATH
+      ln -sf $INSTALL_DIR/atmosphere-cli /usr/local/bin/atmosphere-cli
+
+      echo -e "${GREEN}✓ atmosphere binaries built successfully${NC}"
+      echo -e "${GREEN}✓ atmosphere-cli installed at /usr/local/bin/atmosphere-cli${NC}"
     else
-        echo -e "${RED}Error: Failed to build atmosphere${NC}"
+      echo -e "${RED}Error: Failed to build atmosphere binaries${NC}"
         echo -e "${YELLOW}Try running manually:${NC}"
         echo -e "  cd $BACKEND_DIR"
         echo -e "  go build -o $INSTALL_DIR/atmosphere ./cmd/atmosphere"
+      echo -e "  go build -o $INSTALL_DIR/atmosphere-cli ./cmd/atmosphere-cli"
         exit 1
     fi
 else
     echo -e "${YELLOW}⚠ Backend source not found, skipping build${NC}"
-    echo -e "${YELLOW}  You'll need to manually copy the atmosphere binary to $INSTALL_DIR${NC}"
+    echo -e "${YELLOW}  You'll need to manually copy binaries to $INSTALL_DIR${NC}"
 fi
 
 # Create systemd service
@@ -409,6 +420,7 @@ echo "  docker compose logs -f"
 echo "  docker compose restart"
 echo ""
 echo "API will be available at: http://localhost:3000"
+echo "CLI command: atmosphere-cli"
 echo ""
 echo -e "${GREEN}Next steps:${NC}"
 echo "1. Edit $INSTALL_DIR/.env and configure your settings"

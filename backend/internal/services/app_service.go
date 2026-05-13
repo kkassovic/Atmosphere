@@ -245,6 +245,59 @@ func (s *AppService) DeleteApp(name string) error {
 	return nil
 }
 
+// DestroyApp fully wipes app runtime state and persistent data while preserving backups.
+func (s *AppService) DestroyApp(name string) error {
+	app, err := s.GetApp(name)
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+
+	// Capture volume names before container removal, then wipe them explicitly.
+	volumeNames, err := s.deploymentService.dockerService.GetVolumeNamesByApp(ctx, app.Name)
+	if err != nil {
+		return fmt.Errorf("failed to discover app volumes: %w", err)
+	}
+
+	if err := s.deploymentService.Remove(ctx, app); err != nil {
+		return fmt.Errorf("failed to remove app resources: %w", err)
+	}
+
+	for _, volumeName := range volumeNames {
+		if err := s.deploymentService.dockerService.RemoveVolume(ctx, volumeName); err != nil {
+			return fmt.Errorf("failed to remove volume %s: %w", volumeName, err)
+		}
+	}
+
+	if err := s.repo.DeleteDeploymentLogsForApp(app.ID); err != nil {
+		return err
+	}
+	if err := s.repo.DeleteAppRestoresForApp(app.ID); err != nil {
+		return err
+	}
+	if err := s.repo.DeleteAppBackupScheduleForApp(app.ID); err != nil {
+		return err
+	}
+
+	app.Status = "stopped"
+	app.Domains = []string{}
+	app.EnvVars = make(models.EnvVars)
+	app.GitHubRepo = ""
+	app.GitHubBranch = ""
+	app.GitHubSubdir = ""
+	app.DockerfilePath = ""
+	app.ComposePath = ""
+	app.Port = 0
+	app.LastDeployedAt = nil
+
+	if err := s.repo.Update(app); err != nil {
+		return fmt.Errorf("failed to reset app configuration: %w", err)
+	}
+
+	return nil
+}
+
 // DeployApp deploys an app
 func (s *AppService) DeployApp(name string) (*models.DeploymentLog, error) {
 	app, err := s.GetApp(name)

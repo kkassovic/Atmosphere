@@ -110,6 +110,18 @@ Key configuration options:
 
 ## Usage
 
+### CLI Wrapper
+
+A Go CLI wrapper is available for the API:
+
+```bash
+cd backend
+go build -o atmosphere-cli ./cmd/atmosphere-cli
+./atmosphere-cli apps list
+```
+
+Full command reference: `docs/CLI.md`
+
 ### API Endpoints
 
 Base URL: `http://localhost:3000/api/v1`
