@@ -284,6 +284,34 @@ func (h *Handler) StartAppRestore(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// StartFreshAppRestore handles POST /api/v1/restores/fresh
+func (h *Handler) StartFreshAppRestore(w http.ResponseWriter, r *http.Request) {
+	var req models.CreateFreshAppRestoreRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	if req.SourceApp == "" {
+		respondError(w, http.StatusBadRequest, "source_app is required")
+		return
+	}
+	if req.BackupID == "" {
+		respondError(w, http.StatusBadRequest, "backup_id is required")
+		return
+	}
+
+	restore, err := h.appService.StartFreshAppRestore(req.SourceApp, req.BackupID, req.AppName)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusAccepted, map[string]interface{}{
+		"message": "Fresh app restore started",
+		"restore": restore,
+	})
+}
+
 // GetAppRestore handles GET /api/v1/apps/{name}/restores/{restoreID}
 func (h *Handler) GetAppRestore(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")

@@ -204,6 +204,106 @@ func (s *AppService) StartAppRestore(name, backupID, sourceApp string, restoreAs
 	return restore, nil
 }
 
+// StartFreshAppRestore restores a backup from storage into a new app on a fresh machine.
+func (s *AppService) StartFreshAppRestore(sourceAppName, backupID, targetAppName string) (*models.AppRestore, error) {
+	if s.backupStorage == nil {
+		return nil, fmt.Errorf("backup storage is required")
+	}
+	if !isValidAppName(sourceAppName) {
+		return nil, fmt.Errorf("invalid source_app: must be lowercase alphanumeric with hyphens, max 32 chars")
+	}
+	if targetAppName == "" {
+		targetAppName = sourceAppName
+	}
+	if !isValidAppName(targetAppName) {
+		return nil, fmt.Errorf("invalid app_name: must be lowercase alphanumeric with hyphens, max 32 chars")
+	}
+
+	ctx := context.Background()
+	remotePath := s.backupStorage.GetRemotePath(sourceAppName, backupID)
+	localPath := filepath.Join(s.cfg.LogsDir, "backups", sourceAppName, backupID)
+	if _, err := os.Stat(remotePath); err == nil {
+		localPath = remotePath
+	} else {
+		if err := s.backupStorage.Download(ctx, backupID, remotePath, localPath); err != nil {
+			return nil, fmt.Errorf("failed to download backup from storage: %w", err)
+		}
+	}
+
+	metadata, err := readBackupMetadata(filepath.Join(localPath, "metadata.json"))
+	if err != nil {
+		return nil, err
+	}
+
+	sourceApp := metadata.App
+	if sourceApp.Name == "" {
+		sourceApp.Name = sourceAppName
+	}
+	if sourceApp.DeploymentType == "" {
+		return nil, fmt.Errorf("backup metadata is missing deployment_type")
+	}
+	if sourceApp.BuildType == "" {
+		return nil, fmt.Errorf("backup metadata is missing build_type")
+	}
+
+	if existing, err := s.repo.GetByName(targetAppName); err != nil {
+		return nil, fmt.Errorf("failed to check target app: %w", err)
+	} else if existing != nil {
+		return nil, fmt.Errorf("app with name %s already exists", targetAppName)
+	}
+
+	createReq := &models.CreateAppRequest{
+		Name:           targetAppName,
+		DeploymentType: sourceApp.DeploymentType,
+		BuildType:      sourceApp.BuildType,
+		Domains:        []string{},
+		EnvVars:        sourceApp.EnvVars,
+		GitHubRepo:     sourceApp.GitHubRepo,
+		GitHubBranch:   sourceApp.GitHubBranch,
+		GitHubSubdir:   sourceApp.GitHubSubdir,
+		DockerfilePath: sourceApp.DockerfilePath,
+		ComposePath:    sourceApp.ComposePath,
+		Port:           sourceApp.Port,
+	}
+	if targetAppName == sourceApp.Name {
+		createReq.Domains = sourceApp.Domains
+	}
+	if sourceApp.DeploymentType == "github" {
+		keyPath := filepath.Join(localPath, "deployment.key")
+		keyBytes, err := os.ReadFile(keyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read deployment key from backup: %w", err)
+		}
+		createReq.DeploymentKey = string(keyBytes)
+	}
+
+	app, err := s.CreateApp(createReq)
+	if err != nil {
+		return nil, err
+	}
+
+	restore := &models.AppRestore{
+		RestoreID: fmt.Sprintf("%s-%d", app.Name, time.Now().Unix()),
+		AppID:     app.ID,
+		BackupID:  backupID,
+		Status:    "in_progress",
+		Log:       "",
+	}
+	if err := s.repo.CreateAppRestore(restore); err != nil {
+		_ = s.DeleteApp(app.Name)
+		return nil, fmt.Errorf("failed to create app restore record: %w", err)
+	}
+
+	backup := &models.AppBackup{
+		BackupID: backupID,
+		Path:     localPath,
+		Status:   "success",
+	}
+	go s.runAppRestore(&sourceApp, app, backup, restore, targetAppName != sourceApp.Name)
+
+	return restore, nil
+}
+
 // GetAppRestore gets one restore run for an app.
 func (s *AppService) GetAppRestore(name, restoreID string) (*models.AppRestore, error) {
 	app, err := s.GetApp(name)
@@ -464,6 +564,24 @@ func (s *AppService) finishRestoreWithError(restore *models.AppRestore, logBuild
 	restore.Log = logBuilder.String()
 	restore.CompletedAt = &now
 	_ = s.repo.UpdateAppRestore(restore)
+}
+
+type backupMetadata struct {
+	App models.App `json:"app"`
+}
+
+func readBackupMetadata(metadataPath string) (*backupMetadata, error) {
+	content, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read backup metadata: %w", err)
+	}
+
+	var metadata backupMetadata
+	if err := json.Unmarshal(content, &metadata); err != nil {
+		return nil, fmt.Errorf("failed to parse backup metadata: %w", err)
+	}
+
+	return &metadata, nil
 }
 
 func writeJSONFile(path string, data interface{}) error {

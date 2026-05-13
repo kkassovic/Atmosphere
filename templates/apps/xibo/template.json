@@ -1,7 +1,7 @@
 {
   "id": "xibo",
   "name": "Xibo",
-  "description": "Open source digital signage CMS",
+  "description": "Open source digital signage CMS. Default first login: xibo_admin / password (change immediately).",
   "deployment_type": "manual",
   "build_type": "compose",
   "compose_path": "docker-compose.yml",

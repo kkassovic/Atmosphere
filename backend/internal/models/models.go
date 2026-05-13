@@ -178,6 +178,13 @@ type CreateAppRestoreRequest struct {
 	NewAppName    string `json:"new_app_name,omitempty"`
 }
 
+// CreateFreshAppRestoreRequest restores a backup into a new app on a fresh machine.
+type CreateFreshAppRestoreRequest struct {
+	SourceApp string `json:"source_app"`
+	BackupID  string `json:"backup_id"`
+	AppName   string `json:"app_name,omitempty"`
+}
+
 // CreateAppBackupRequest starts a backup for an app
 type CreateAppBackupRequest struct {
 	UploadToS3 bool `json:"upload_to_s3,omitempty"` // Upload to S3 after creating backup

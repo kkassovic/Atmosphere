@@ -161,6 +161,26 @@ Behavior:
 - workspace and key are restored under the new app name
 - compose-style volume names are remapped to the new app prefix
 
+## Restore to Fresh Machine from S3
+
+Use this when the destination machine has no existing app record and the backup lives in S3:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/restores/fresh \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_app": "openproject",
+    "backup_id": "my-app-1746659903",
+    "app_name": "openproject"
+  }'
+```
+
+Behavior:
+- downloads the backup from storage using `source_app` and `backup_id`
+- recreates the app from `metadata.json`
+- restores workspace, deployment key, and volumes into the new app
+- keeps the existing app-scoped restore flow unchanged
+
 ## Check Restore Status
 
 Check one restore run:

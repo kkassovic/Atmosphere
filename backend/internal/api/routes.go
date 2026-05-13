@@ -74,6 +74,7 @@ func NewRouter(appService *services.AppService) http.Handler {
 		r.Put("/apps/{name}/backup-schedule", handler.UpsertAppBackupSchedule)
 		r.Post("/apps/{name}/restores", handler.StartAppRestore)
 		r.Get("/apps/{name}/restores/{restoreID}", handler.GetAppRestore)
+		r.Post("/restores/fresh", handler.StartFreshAppRestore)
 
 		// File upload (manual deployments)
 		r.Post("/apps/{name}/files", handler.UploadFile)
