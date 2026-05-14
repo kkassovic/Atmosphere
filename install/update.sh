@@ -30,6 +30,10 @@ fi
 echo -e "${YELLOW}Preparing update...${NC}"
 mkdir -p "$INSTALL_DIR"
 
+echo -e "${YELLOW}Updating source repository...${NC}"
+cd "$PROJECT_ROOT"
+git -c safe.directory="$PROJECT_ROOT" pull origin main
+
 if ! command -v go &> /dev/null; then
   echo -e "${YELLOW}Installing Go...${NC}"
   GO_VERSION="1.22.1"
