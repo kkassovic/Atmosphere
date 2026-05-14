@@ -162,9 +162,10 @@ func (s *DeploymentService) gitClone(repo, dest, keyPath, branch string, logOutp
 // gitPull pulls latest changes from Git repository
 func (s *DeploymentService) gitPull(repoDir, keyPath, branch string, logOutput *strings.Builder) error {
 	sshCmd := fmt.Sprintf("ssh -i %s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null", keyPath)
+	safeDirConfig := fmt.Sprintf("safe.directory=%s", repoDir)
 
 	// Fetch
-	cmd := exec.Command("git", "fetch", "origin")
+	cmd := exec.Command("git", "-c", safeDirConfig, "fetch", "origin")
 	cmd.Dir = repoDir
 	cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=%s", sshCmd))
 	output, err := cmd.CombinedOutput()
@@ -175,7 +176,7 @@ func (s *DeploymentService) gitPull(repoDir, keyPath, branch string, logOutput *
 
 	// Checkout branch
 	if branch != "" {
-		cmd = exec.Command("git", "checkout", branch)
+		cmd = exec.Command("git", "-c", safeDirConfig, "checkout", branch)
 		cmd.Dir = repoDir
 		output, err = cmd.CombinedOutput()
 		logOutput.Write(output)
@@ -185,7 +186,11 @@ func (s *DeploymentService) gitPull(repoDir, keyPath, branch string, logOutput *
 	}
 
 	// Pull
-	cmd = exec.Command("git", "pull", "origin", branch)
+	pullArgs := []string{"-c", safeDirConfig, "pull", "origin"}
+	if branch != "" {
+		pullArgs = append(pullArgs, branch)
+	}
+	cmd = exec.Command("git", pullArgs...)
 	cmd.Dir = repoDir
 	cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_SSH_COMMAND=%s", sshCmd))
 	output, err = cmd.CombinedOutput()
