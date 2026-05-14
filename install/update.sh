@@ -65,6 +65,11 @@ fi
 
 echo -e "${YELLOW}Building latest binaries...${NC}"
 cd "$BACKEND_DIR"
+export GOFLAGS="-mod=mod"
+if [ ! -f go.sum ]; then
+  echo -e "${YELLOW}go.sum missing, generating dependency checksums...${NC}"
+  go mod tidy
+fi
 if ! go mod download; then
   echo -e "${YELLOW}go mod download failed, repairing module checksums...${NC}"
   go mod tidy
