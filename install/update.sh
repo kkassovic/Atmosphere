@@ -32,7 +32,8 @@ mkdir -p "$INSTALL_DIR"
 
 echo -e "${YELLOW}Updating source repository...${NC}"
 cd "$PROJECT_ROOT"
-git -c safe.directory="$PROJECT_ROOT" pull origin main
+git -c safe.directory="$PROJECT_ROOT" fetch origin main
+git -c safe.directory="$PROJECT_ROOT" reset --hard origin/main
 
 if ! command -v go &> /dev/null; then
   echo -e "${YELLOW}Installing Go...${NC}"
