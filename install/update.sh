@@ -64,7 +64,11 @@ fi
 
 echo -e "${YELLOW}Building latest binaries...${NC}"
 cd "$BACKEND_DIR"
-go mod download
+if ! go mod download; then
+  echo -e "${YELLOW}go mod download failed, repairing module checksums...${NC}"
+  go mod tidy
+  go mod download
+fi
 CGO_ENABLED=1 go build -o "$INSTALL_DIR/atmosphere" ./cmd/atmosphere
 CGO_ENABLED=1 go build -o "$INSTALL_DIR/atmosphere-cli" ./cmd/atmosphere-cli
 chmod +x "$INSTALL_DIR/atmosphere" "$INSTALL_DIR/atmosphere-cli"
