@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types"
 	"github.com/joho/godotenv"
 )
 
@@ -409,11 +410,29 @@ func (s *DeploymentService) Restart(ctx context.Context, app *models.App) error 
 
 // Remove removes an application and its containers
 func (s *DeploymentService) Remove(ctx context.Context, app *models.App) error {
-	// Stop and remove containers
-	containers, err := s.dockerService.GetContainersByLabel(ctx, "atmosphere.app", app.Name)
+	if app.BuildType == "compose" {
+		// Best-effort compose teardown first; continue to fallback removal regardless.
+		_ = s.runComposeLifecycle(ctx, app, []string{"down", "--remove-orphans"})
+	}
+
+	// Stop and remove any remaining containers tied to this app.
+	containersByAppLabel, err := s.dockerService.GetContainersByLabel(ctx, "atmosphere.app", app.Name)
 	if err != nil {
 		return err
 	}
+
+	projectName := fmt.Sprintf("atmosphere-%s", app.Name)
+	containersByComposeProject, err := s.dockerService.GetContainersByComposeProject(ctx, projectName)
+	if err != nil {
+		return err
+	}
+
+	containersByNamePrefix, err := s.dockerService.GetContainersByNamePrefix(ctx, app.Name+"-")
+	if err != nil {
+		return err
+	}
+
+	containers := mergeUniqueContainers(containersByAppLabel, containersByComposeProject, containersByNamePrefix)
 
 	for _, container := range containers {
 		if err := s.dockerService.StopContainer(ctx, container.ID); err != nil {
@@ -437,6 +456,24 @@ func (s *DeploymentService) Remove(ctx context.Context, app *models.App) error {
 	}
 
 	return nil
+}
+
+func mergeUniqueContainers(groups ...[]types.Container) []types.Container {
+	byID := make(map[string]types.Container)
+	for _, group := range groups {
+		for _, c := range group {
+			if _, exists := byID[c.ID]; !exists {
+				byID[c.ID] = c
+			}
+		}
+	}
+
+	out := make([]types.Container, 0, len(byID))
+	for _, c := range byID {
+		out = append(out, c)
+	}
+
+	return out
 }
 
 // Helper functions

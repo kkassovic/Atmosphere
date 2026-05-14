@@ -105,6 +105,38 @@ func (s *DockerService) GetContainersByLabel(ctx context.Context, labelKey, labe
 	return containers, nil
 }
 
+// GetContainersByComposeProject finds containers created under a specific compose project.
+func (s *DockerService) GetContainersByComposeProject(ctx context.Context, projectName string) ([]types.Container, error) {
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("label", fmt.Sprintf("com.docker.compose.project=%s", projectName))
+
+	containers, err := s.client.ContainerList(ctx, container.ListOptions{
+		All:     true,
+		Filters: filterArgs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list compose project containers: %w", err)
+	}
+
+	return containers, nil
+}
+
+// GetContainersByNamePrefix finds containers with names matching a prefix.
+func (s *DockerService) GetContainersByNamePrefix(ctx context.Context, prefix string) ([]types.Container, error) {
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("name", prefix)
+
+	containers, err := s.client.ContainerList(ctx, container.ListOptions{
+		All:     true,
+		Filters: filterArgs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers by name prefix: %w", err)
+	}
+
+	return containers, nil
+}
+
 // GetContainerLogs retrieves logs from a container
 func (s *DockerService) GetContainerLogs(ctx context.Context, containerID string) (string, error) {
 	options := container.LogsOptions{
@@ -188,12 +220,7 @@ func (s *DockerService) GetVolumeNamesByApp(ctx context.Context, appName string)
 	}
 
 	projectName := fmt.Sprintf("atmosphere-%s", appName)
-	projectFilter := filters.NewArgs()
-	projectFilter.Add("label", fmt.Sprintf("com.docker.compose.project=%s", projectName))
-	containersByComposeProject, err := s.client.ContainerList(ctx, container.ListOptions{
-		All:     true,
-		Filters: projectFilter,
-	})
+	containersByComposeProject, err := s.GetContainersByComposeProject(ctx, projectName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list compose project containers: %w", err)
 	}
