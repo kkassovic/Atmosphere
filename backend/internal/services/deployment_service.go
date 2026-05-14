@@ -605,6 +605,11 @@ func (s *DeploymentService) CreateComposeCommand(ctx context.Context, workDir st
 		envMap["DOMAIN"] = ""
 		envMap["DOMAINS"] = ""
 	}
+
+	// Normalize special values after all env sources are merged.
+	for key, value := range envMap {
+		envMap[key] = normalizeComposeEnvValue(key, value)
+	}
 	
 	// Convert map to environment array
 	env := make([]string, 0, len(envMap))
