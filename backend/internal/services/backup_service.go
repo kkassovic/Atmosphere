@@ -505,48 +505,39 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 		appendLog("Restored deployment key")
 	}
 
-	   volumesDir := filepath.Join(backupPath, "volumes")
-	   entries, err := os.ReadDir(volumesDir)
-	   if err == nil {
-		   sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
-		   for _, entry := range entries {
-			   if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".tar.gz") {
-				   continue
-			   }
-			   sourceVolumeName := restoreVolumeNameFromArchive(entry.Name())
-			   if sourceVolumeName == "" {
-				   appendLog(fmt.Sprintf("Skipping invalid volume archive name: %s", entry.Name()))
-				   continue
-			   }
+	volumesDir := filepath.Join(backupPath, "volumes")
+	entries, err := os.ReadDir(volumesDir)
+	if err == nil {
+		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".tar.gz") {
+				continue
+			}
+			sourceVolumeName := restoreVolumeNameFromArchive(entry.Name())
+			if sourceVolumeName == "" {
+				appendLog(fmt.Sprintf("Skipping invalid volume archive name: %s", entry.Name()))
+				continue
+			}
 
-			   targetVolumeName := mapVolumeNameForRestore(sourceVolumeName, sourceApp.Name, targetApp.Name, restoreAsNew)
+			targetVolumeName := mapVolumeNameForRestore(sourceVolumeName, sourceApp.Name, targetApp.Name, restoreAsNew)
 
-			   if err := s.deploymentService.dockerService.EnsureVolume(ctx, targetVolumeName); err != nil {
-				   s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to ensure volume %s: %w", targetVolumeName, err))
-				   return
-			   }
+			if err := s.deploymentService.dockerService.EnsureVolume(ctx, targetVolumeName); err != nil {
+				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to ensure volume %s: %w", targetVolumeName, err))
+				return
+			}
 
-			   sourceFile := filepath.Join(volumesDir, entry.Name())
-			   if err := restoreDockerVolume(ctx, targetVolumeName, sourceFile); err != nil {
-				   s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore volume %s: %w", targetVolumeName, err))
-				   return
-			   }
-			   // After restoring the volume, fix ownership inside the volume mount
-			   if mountPath, err := s.deploymentService.dockerService.GetVolumeMountpoint(targetVolumeName); err == nil {
-				   _ = recursiveChown(mountPath, 1000, 1000)
-			   }
-			   appendLog(fmt.Sprintf("Restored volume %s (source %s) and fixed ownership", targetVolumeName, sourceVolumeName))
-		   }
-	   }
-// recursiveChown sets ownership for all files/dirs under root to the given uid/gid
-func recursiveChown(root string, uid, gid int) error {
-   return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-	   if err == nil {
-		   os.Chown(path, uid, gid)
-	   }
-	   return nil
-   })
-}
+			sourceFile := filepath.Join(volumesDir, entry.Name())
+			if err := restoreDockerVolume(ctx, targetVolumeName, sourceFile); err != nil {
+				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore volume %s: %w", targetVolumeName, err))
+				return
+			}
+			// After restoring the volume, fix ownership inside the volume mount.
+			if mountPath, err := s.deploymentService.dockerService.GetVolumeMountpoint(ctx, targetVolumeName); err == nil {
+				_ = recursiveChown(mountPath, 1000, 1000)
+			}
+			appendLog(fmt.Sprintf("Restored volume %s (source %s) and fixed ownership", targetVolumeName, sourceVolumeName))
+		}
+	}
 
 	if wasRunning {
 		if err := s.deploymentService.Restart(ctx, sourceApp); err != nil {
@@ -579,6 +570,16 @@ func (s *AppService) finishRestoreWithError(restore *models.AppRestore, logBuild
 	restore.Log = logBuilder.String()
 	restore.CompletedAt = &now
 	_ = s.repo.UpdateAppRestore(restore)
+}
+
+// recursiveChown sets ownership for all files/dirs under root to the given uid/gid.
+func recursiveChown(root string, uid, gid int) error {
+	return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err == nil {
+			_ = os.Chown(path, uid, gid)
+		}
+		return nil
+	})
 }
 
 type backupMetadata struct {
