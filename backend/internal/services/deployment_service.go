@@ -6,6 +6,7 @@ import (
 	"atmosphere/internal/models"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -541,7 +542,8 @@ func (s *DeploymentService) createEnvFile(path string, envVars map[string]string
 	defer f.Close()
 
 	for key, value := range envVars {
-		if _, err := f.WriteString(fmt.Sprintf("%s=%s\n", key, value)); err != nil {
+		normalizedValue := normalizeComposeEnvValue(key, value)
+		if _, err := f.WriteString(fmt.Sprintf("%s=%s\n", key, normalizedValue)); err != nil {
 			return err
 		}
 	}
@@ -583,7 +585,7 @@ func (s *DeploymentService) CreateComposeCommand(ctx context.Context, workDir st
 
 	// Apply app-level env vars persisted in Atmosphere.
 	for key, value := range app.EnvVars {
-		envMap[key] = value
+		envMap[key] = normalizeComposeEnvValue(key, value)
 	}
 	
 	// Add Atmosphere-specific variables (highest priority)
@@ -612,6 +614,47 @@ func (s *DeploymentService) CreateComposeCommand(ctx context.Context, workDir st
 	
 	cmd.Env = env
 	return cmd
+}
+
+func normalizeComposeEnvValue(key, value string) string {
+	if key != "OPENPROJECT_ADDITIONAL__HOST__NAMES" {
+		return value
+	}
+
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return value
+	}
+
+	if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
+		return trimmed
+	}
+
+	parts := strings.FieldsFunc(trimmed, func(r rune) bool {
+		return r == ',' || r == '\n'
+	})
+	if len(parts) == 0 {
+		return value
+	}
+
+	hosts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		host := strings.TrimSpace(part)
+		if host == "" {
+			continue
+		}
+		hosts = append(hosts, host)
+	}
+	if len(hosts) == 0 {
+		return value
+	}
+
+	encoded, err := json.Marshal(hosts)
+	if err != nil {
+		return value
+	}
+
+	return string(encoded)
 }
 
 // createTarArchive creates a tar archive from a directory
