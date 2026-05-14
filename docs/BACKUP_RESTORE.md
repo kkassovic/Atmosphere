@@ -179,6 +179,7 @@ Behavior:
 - downloads the backup from storage using `source_app` and `backup_id`
 - recreates the app from `metadata.json`
 - restores workspace, deployment key, and volumes into the new app
+- deploys from the restored workspace snapshot (no Git clone/fetch/pull)
 - keeps the existing app-scoped restore flow unchanged
 
 ## Check Restore Status

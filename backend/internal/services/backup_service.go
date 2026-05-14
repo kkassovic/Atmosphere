@@ -199,7 +199,7 @@ func (s *AppService) StartAppRestore(name, backupID, sourceApp string, restoreAs
 		return nil, fmt.Errorf("failed to create app restore record: %w", err)
 	}
 
-	go s.runAppRestore(app, targetApp, backup, restore, restoreAsNew)
+	go s.runAppRestore(app, targetApp, backup, restore, restoreAsNew, false)
 
 	return restore, nil
 }
@@ -299,7 +299,7 @@ func (s *AppService) StartFreshAppRestore(sourceAppName, backupID, targetAppName
 		Path:     localPath,
 		Status:   "success",
 	}
-	go s.runAppRestore(&sourceApp, app, backup, restore, targetAppName != sourceApp.Name)
+	go s.runAppRestore(&sourceApp, app, backup, restore, targetAppName != sourceApp.Name, true)
 
 	return restore, nil
 }
@@ -429,7 +429,7 @@ func (s *AppService) runAppBackup(app *models.App, backup *models.AppBackup, upl
 	_ = s.repo.UpdateAppBackup(backup)
 }
 
-func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App, backup *models.AppBackup, restore *models.AppRestore, restoreAsNew bool) {
+func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App, backup *models.AppBackup, restore *models.AppRestore, restoreAsNew bool, deployFromSnapshot bool) {
 	var logBuilder strings.Builder
 	ctx := context.Background()
 
@@ -462,7 +462,7 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 		}
 	}
 
-	wasRunning := !restoreAsNew && sourceApp.Status == "running"
+	wasRunning := !deployFromSnapshot && !restoreAsNew && sourceApp.Status == "running"
 	if wasRunning {
 		if err := s.deploymentService.Stop(ctx, sourceApp); err != nil {
 			appendLog(fmt.Sprintf("Warning: failed to stop running app before restore: %v", err))
@@ -544,7 +544,22 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 		}
 	}
 
-	if wasRunning {
+	if deployFromSnapshot {
+		appendLog("Deploying restored app from workspace snapshot (no Git sync)")
+		deployLog, err := s.deploymentService.DeployFromWorkspace(ctx, targetApp)
+		logBuilder.WriteString(deployLog)
+		if err != nil {
+			s.finishRestoreWithError(restore, &logBuilder, err)
+			return
+		}
+
+		now := time.Now()
+		targetApp.Status = "running"
+		targetApp.LastDeployedAt = &now
+		if err := s.repo.Update(targetApp); err != nil {
+			appendLog(fmt.Sprintf("Warning: failed to persist app status after restored deployment: %v", err))
+		}
+	} else if wasRunning {
 		if err := s.deploymentService.Restart(ctx, sourceApp); err != nil {
 			appendLog(fmt.Sprintf("Warning: failed to restart app after restore: %v", err))
 		} else {

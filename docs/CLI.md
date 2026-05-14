@@ -187,6 +187,8 @@ atmosphere-cli restores fresh --source-app my-app --backup-id my-app-1746659903 
 atmosphere-cli restores get my-app my-app-1746660020
 ```
 
+Note: `restores fresh` deploys from the restored workspace snapshot and skips Git sync (no clone/fetch/pull).
+
 ## Template Commands
 
 ```bash

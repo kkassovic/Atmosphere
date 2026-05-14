@@ -35,16 +35,29 @@ func NewDeploymentService(cfg *config.Config, dockerService *DockerService) *Dep
 
 // Deploy deploys an application
 func (s *DeploymentService) Deploy(ctx context.Context, app *models.App) (string, error) {
+	return s.deploy(ctx, app, true)
+}
+
+// DeployFromWorkspace deploys using the existing workspace snapshot without syncing Git.
+func (s *DeploymentService) DeployFromWorkspace(ctx context.Context, app *models.App) (string, error) {
+	return s.deploy(ctx, app, false)
+}
+
+func (s *DeploymentService) deploy(ctx context.Context, app *models.App, syncGit bool) (string, error) {
 	logOutput := &strings.Builder{}
 
 	// Prepare workspace
 	workspaceDir := s.getWorkspaceDir(app.Name)
 	logOutput.WriteString(fmt.Sprintf("[%s] Preparing workspace: %s\n", time.Now().Format("15:04:05"), workspaceDir))
 
-	// For GitHub deployments, clone/pull the repository
+	// For GitHub deployments, optionally clone/pull the repository.
 	if app.DeploymentType == "github" {
-		if err := s.prepareGitHubDeployment(app, logOutput); err != nil {
-			return logOutput.String(), fmt.Errorf("failed to prepare GitHub deployment: %w", err)
+		if syncGit {
+			if err := s.prepareGitHubDeployment(app, logOutput); err != nil {
+				return logOutput.String(), fmt.Errorf("failed to prepare GitHub deployment: %w", err)
+			}
+		} else {
+			logOutput.WriteString(fmt.Sprintf("[%s] Skipping Git sync, using restored workspace snapshot\n", time.Now().Format("15:04:05")))
 		}
 	}
 
