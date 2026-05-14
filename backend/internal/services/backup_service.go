@@ -482,11 +482,13 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 			s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to create workspace: %w", err))
 			return
 		}
-		if err := extractTarGz(workspaceArchive, workspaceDir); err != nil {
-			s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore workspace: %w", err))
-			return
-		}
-		appendLog("Restored workspace")
+		   if err := extractTarGz(workspaceArchive, workspaceDir); err != nil {
+			   s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore workspace: %w", err))
+			   return
+		   }
+		   // Ensure workspace files are owned by UID/GID 1000 (OpenProject user)
+		   _ = recursiveChown(workspaceDir, 1000, 1000)
+		   appendLog("Restored workspace and fixed ownership")
 	}
 
 	backupKeyPath := filepath.Join(backupPath, "deployment.key")
@@ -503,35 +505,48 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 		appendLog("Restored deployment key")
 	}
 
-	volumesDir := filepath.Join(backupPath, "volumes")
-	entries, err := os.ReadDir(volumesDir)
-	if err == nil {
-		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
-		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".tar.gz") {
-				continue
-			}
-			sourceVolumeName := restoreVolumeNameFromArchive(entry.Name())
-			if sourceVolumeName == "" {
-				appendLog(fmt.Sprintf("Skipping invalid volume archive name: %s", entry.Name()))
-				continue
-			}
+	   volumesDir := filepath.Join(backupPath, "volumes")
+	   entries, err := os.ReadDir(volumesDir)
+	   if err == nil {
+		   sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+		   for _, entry := range entries {
+			   if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".tar.gz") {
+				   continue
+			   }
+			   sourceVolumeName := restoreVolumeNameFromArchive(entry.Name())
+			   if sourceVolumeName == "" {
+				   appendLog(fmt.Sprintf("Skipping invalid volume archive name: %s", entry.Name()))
+				   continue
+			   }
 
-			targetVolumeName := mapVolumeNameForRestore(sourceVolumeName, sourceApp.Name, targetApp.Name, restoreAsNew)
+			   targetVolumeName := mapVolumeNameForRestore(sourceVolumeName, sourceApp.Name, targetApp.Name, restoreAsNew)
 
-			if err := s.deploymentService.dockerService.EnsureVolume(ctx, targetVolumeName); err != nil {
-				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to ensure volume %s: %w", targetVolumeName, err))
-				return
-			}
+			   if err := s.deploymentService.dockerService.EnsureVolume(ctx, targetVolumeName); err != nil {
+				   s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to ensure volume %s: %w", targetVolumeName, err))
+				   return
+			   }
 
-			sourceFile := filepath.Join(volumesDir, entry.Name())
-			if err := restoreDockerVolume(ctx, targetVolumeName, sourceFile); err != nil {
-				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore volume %s: %w", targetVolumeName, err))
-				return
-			}
-			appendLog(fmt.Sprintf("Restored volume %s (source %s)", targetVolumeName, sourceVolumeName))
-		}
-	}
+			   sourceFile := filepath.Join(volumesDir, entry.Name())
+			   if err := restoreDockerVolume(ctx, targetVolumeName, sourceFile); err != nil {
+				   s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore volume %s: %w", targetVolumeName, err))
+				   return
+			   }
+			   // After restoring the volume, fix ownership inside the volume mount
+			   if mountPath, err := s.deploymentService.dockerService.GetVolumeMountpoint(targetVolumeName); err == nil {
+				   _ = recursiveChown(mountPath, 1000, 1000)
+			   }
+			   appendLog(fmt.Sprintf("Restored volume %s (source %s) and fixed ownership", targetVolumeName, sourceVolumeName))
+		   }
+	   }
+// recursiveChown sets ownership for all files/dirs under root to the given uid/gid
+func recursiveChown(root string, uid, gid int) error {
+   return filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	   if err == nil {
+		   os.Chown(path, uid, gid)
+	   }
+	   return nil
+   })
+}
 
 	if wasRunning {
 		if err := s.deploymentService.Restart(ctx, sourceApp); err != nil {
