@@ -247,7 +247,16 @@ func (s *AppService) ListApps() ([]*models.App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list apps: %w", err)
 	}
-	return apps, nil
+
+	visible := make([]*models.App, 0, len(apps))
+	for _, app := range apps {
+		if s.isDestroyedApp(app) {
+			continue
+		}
+		visible = append(visible, app)
+	}
+
+	return visible, nil
 }
 
 // UpdateApp updates an existing app
