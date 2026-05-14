@@ -482,13 +482,16 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 			s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to create workspace: %w", err))
 			return
 		}
-		   if err := extractTarGz(workspaceArchive, workspaceDir); err != nil {
-			   s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore workspace: %w", err))
-			   return
-		   }
-		   // Ensure workspace files are owned by UID/GID 1000 (OpenProject user)
-		   _ = recursiveChown(workspaceDir, 1000, 1000)
-		   appendLog("Restored workspace and fixed ownership")
+		if err := extractTarGz(workspaceArchive, workspaceDir); err != nil {
+			s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore workspace: %w", err))
+			return
+		}
+		if uid, gid, ok := getEffectiveOwnership(); ok {
+			_ = recursiveChown(workspaceDir, uid, gid)
+			appendLog(fmt.Sprintf("Restored workspace and normalized ownership to uid=%d gid=%d", uid, gid))
+		} else {
+			appendLog("Restored workspace")
+		}
 	}
 
 	backupKeyPath := filepath.Join(backupPath, "deployment.key")
@@ -531,11 +534,13 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore volume %s: %w", targetVolumeName, err))
 				return
 			}
-			// After restoring the volume, fix ownership inside the volume mount.
+			// After restoring the volume, align ownership inside the mount with the Atmosphere process user.
 			if mountPath, err := s.deploymentService.dockerService.GetVolumeMountpoint(ctx, targetVolumeName); err == nil {
-				_ = recursiveChown(mountPath, 1000, 1000)
+				if uid, gid, ok := getEffectiveOwnership(); ok {
+					_ = recursiveChown(mountPath, uid, gid)
+				}
 			}
-			appendLog(fmt.Sprintf("Restored volume %s (source %s) and fixed ownership", targetVolumeName, sourceVolumeName))
+			appendLog(fmt.Sprintf("Restored volume %s (source %s) and normalized ownership", targetVolumeName, sourceVolumeName))
 		}
 	}
 
@@ -580,6 +585,15 @@ func recursiveChown(root string, uid, gid int) error {
 		}
 		return nil
 	})
+}
+
+func getEffectiveOwnership() (int, int, bool) {
+	uid := os.Geteuid()
+	gid := os.Getegid()
+	if uid < 0 || gid < 0 {
+		return 0, 0, false
+	}
+	return uid, gid, true
 }
 
 type backupMetadata struct {
