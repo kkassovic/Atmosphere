@@ -199,6 +199,23 @@ func (s *DockerService) EnsureVolume(ctx context.Context, volumeName string) err
 	return nil
 }
 
+// GetVolumeMountpoint returns the host mountpoint path for a named Docker volume.
+func (s *DockerService) GetVolumeMountpoint(ctx context.Context, volumeName string) (string, error) {
+	if volumeName == "" {
+		return "", fmt.Errorf("volume name is required")
+	}
+
+	v, err := s.client.VolumeInspect(ctx, volumeName)
+	if err != nil {
+		return "", fmt.Errorf("failed to inspect volume %s: %w", volumeName, err)
+	}
+	if v.Mountpoint == "" {
+		return "", fmt.Errorf("volume %s has empty mountpoint", volumeName)
+	}
+
+	return v.Mountpoint, nil
+}
+
 // RemoveVolume removes a Docker volume and its data.
 func (s *DockerService) RemoveVolume(ctx context.Context, volumeName string) error {
 	if volumeName == "" {

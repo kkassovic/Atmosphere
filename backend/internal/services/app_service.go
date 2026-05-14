@@ -112,6 +112,9 @@ func (s *AppService) CreateApp(req *models.CreateAppRequest) (*models.App, error
 		return nil, fmt.Errorf("failed to check existing app: %w", err)
 	}
 	if existing != nil {
+		if s.isDestroyedApp(existing) {
+			return s.recreateDestroyedApp(existing, req)
+		}
 		return nil, fmt.Errorf("app with name %s already exists", req.Name)
 	}
 
@@ -163,6 +166,67 @@ func (s *AppService) CreateApp(req *models.CreateAppRequest) (*models.App, error
 	}
 
 	return app, nil
+}
+
+func (s *AppService) isDestroyedApp(app *models.App) bool {
+	if app == nil {
+		return false
+	}
+
+	return app.Status == "stopped" &&
+		len(app.Domains) == 0 &&
+		len(app.EnvVars) == 0 &&
+		app.GitHubRepo == "" &&
+		app.GitHubBranch == "" &&
+		app.GitHubSubdir == "" &&
+		app.DockerfilePath == "" &&
+		app.ComposePath == "" &&
+		app.Port == 0 &&
+		app.LastDeployedAt == nil
+}
+
+func (s *AppService) recreateDestroyedApp(existing *models.App, req *models.CreateAppRequest) (*models.App, error) {
+	workspaceDir := filepath.Join(s.cfg.WorkspacesDir, req.Name)
+	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create workspace directory: %w", err)
+	}
+
+	if req.DeploymentType == "github" && req.DeploymentKey != "" {
+		if err := s.saveDeploymentKey(req.Name, req.DeploymentKey); err != nil {
+			return nil, fmt.Errorf("failed to save deployment key: %w", err)
+		}
+	}
+
+	port := req.Port
+	if port == 0 {
+		port = 8080
+	}
+
+	existing.DeploymentType = req.DeploymentType
+	existing.BuildType = req.BuildType
+	existing.Status = "stopped"
+	existing.Domains = req.Domains
+	existing.EnvVars = req.EnvVars
+	existing.GitHubRepo = req.GitHubRepo
+	existing.GitHubBranch = req.GitHubBranch
+	existing.GitHubSubdir = req.GitHubSubdir
+	existing.DockerfilePath = req.DockerfilePath
+	existing.ComposePath = req.ComposePath
+	existing.Port = port
+	existing.LastDeployedAt = nil
+
+	if existing.EnvVars == nil {
+		existing.EnvVars = make(models.EnvVars)
+	}
+	if existing.Domains == nil {
+		existing.Domains = []string{}
+	}
+
+	if err := s.repo.Update(existing); err != nil {
+		return nil, fmt.Errorf("failed to recreate destroyed app: %w", err)
+	}
+
+	return existing, nil
 }
 
 // GetApp retrieves an app by name
