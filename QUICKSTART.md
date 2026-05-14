@@ -34,9 +34,16 @@ sudo ./install/install.sh
 This will:
 - Install Docker and required tools
 - Set up Traefik reverse proxy
-- Build and install atmosphere
+- Build and install atmosphere server and CLI
+- Link `atmosphere-cli` into `/usr/local/bin` so it is ready to use immediately
 - Create systemd service
 - Configure firewall
+
+After installation, verify the CLI is available with:
+
+```bash
+atmosphere-cli --help
+```
 
 ⏱️ Takes about 5-10 minutes depending on your connection.
 

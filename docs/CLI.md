@@ -2,6 +2,14 @@
 
 This CLI is a thin wrapper around Atmosphere API endpoints.
 
+## Install
+
+The standard atmosphere installer builds and links `atmosphere-cli` automatically, so it is ready to use right after installation:
+
+```bash
+atmosphere-cli --help
+```
+
 ## Build
 
 From the `backend` directory:
@@ -10,7 +18,7 @@ From the `backend` directory:
 go build -o atmosphere-cli ./cmd/atmosphere-cli
 ```
 
-Optional install:
+Optional install for local development:
 
 ```bash
 go install ./cmd/atmosphere-cli
@@ -36,23 +44,124 @@ atm apps list
 Examples:
 
 ```bash
-./atmosphere-cli --api http://localhost:3000 apps list
-./atmosphere-cli --timeout 60s apps logs my-app --limit 50
+atmosphere-cli --api http://localhost:3000 apps list
+atmosphere-cli --timeout 60s apps logs my-app --limit 50
 ```
 
 ## App Commands
 
 ```bash
-./atmosphere-cli apps list
-./atmosphere-cli apps get my-app
-./atmosphere-cli apps create --file app.json
-./atmosphere-cli apps update my-app --json '{"domains":["app.example.com"]}'
-./atmosphere-cli apps deploy my-app
-./atmosphere-cli apps stop my-app
-./atmosphere-cli apps start my-app
-./atmosphere-cli apps delete my-app
-./atmosphere-cli apps destroy my-app
-./atmosphere-cli apps logs my-app --limit 20
+atmosphere-cli apps list
+atmosphere-cli apps get my-app
+atmosphere-cli apps create --file app.json
+atmosphere-cli apps update my-app --json '{"domains":["app.example.com"]}'
+atmosphere-cli apps deploy my-app
+atmosphere-cli apps stop my-app
+atmosphere-cli apps start my-app
+atmosphere-cli apps delete my-app
+atmosphere-cli apps destroy my-app
+atmosphere-cli apps logs my-app --limit 20
+```
+
+### Sample app.json for custom docker-compose override
+
+Use this when your repository follows the base + override compose pattern, for example `docker-compose.yml` plus `docker-compose.prod.yml`:
+
+```json
+{
+	"name": "my-github-app",
+	"deployment_type": "github",
+	"build_type": "compose",
+	"compose_path": "docker-compose.prod.yml",
+	"github_repo": "git@github.com:username/repository.git",
+	"github_branch": "main",
+	"deployment_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...",
+	"domains": ["app.example.com"],
+	"env_vars": {
+		"NODE_ENV": "production",
+		"DATABASE_URL": "postgresql://..."
+	}
+}
+```
+
+Then create the app with:
+
+```bash
+atmosphere-cli apps create --file app.json
+```
+
+Or create it inline without a separate file:
+
+```bash
+atmosphere-cli apps create --json "$(jq -n \
+	--arg name "my-github-app" \
+	--arg deployment_type "github" \
+	--arg build_type "compose" \
+	--arg compose_path "docker-compose.prod.yml" \
+	--arg github_repo "git@github.com:username/repository.git" \
+	--arg github_branch "main" \
+	--arg deployment_key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..." \
+	--arg domain "app.example.com" \
+	'{
+		name: $name,
+		deployment_type: $deployment_type,
+		build_type: $build_type,
+		compose_path: $compose_path,
+		github_repo: $github_repo,
+		github_branch: $github_branch,
+		deployment_key: $deployment_key,
+		domains: [$domain],
+		env_vars: {
+			NODE_ENV: "production",
+			DATABASE_URL: "postgresql://..."
+		}
+	}')"
+```
+
+### Sample app.json for manual compose override
+
+Use this when you are creating the app manually but still want Atmosphere to deploy a compose stack that uses an override file:
+
+```json
+{
+	"name": "my-compose-app",
+	"deployment_type": "manual",
+	"build_type": "compose",
+	"compose_path": "docker-compose.prod.yml",
+	"domain": "app.example.com",
+	"env_vars": {
+		"NODE_ENV": "production",
+		"PORT": "3000"
+	}
+}
+```
+
+Then create the app with:
+
+```bash
+atmosphere-cli apps create --file app.json
+```
+
+Or create it inline without a separate file:
+
+```bash
+atmosphere-cli apps create --json "$(jq -n \
+	--arg name "my-compose-app" \
+	--arg deployment_type "manual" \
+	--arg build_type "compose" \
+	--arg compose_path "docker-compose.prod.yml" \
+	--arg domain "app.example.com" \
+	'{
+		name: $name,
+		deployment_type: $deployment_type,
+		build_type: $build_type,
+		compose_path: $compose_path,
+		domain: $domain,
+		env_vars: {
+			NODE_ENV: "production",
+			PORT: "3000"
+		}
+	}')"
 ```
 
 Notes:
@@ -62,28 +171,28 @@ Notes:
 ## Backup Commands
 
 ```bash
-./atmosphere-cli backups create my-app
-./atmosphere-cli backups create my-app --upload-to-s3
-./atmosphere-cli backups list my-app --limit 50
-./atmosphere-cli backups get my-app my-app-1746659903
-./atmosphere-cli backups delete my-app my-app-1746659903
+atmosphere-cli backups create my-app
+atmosphere-cli backups create my-app --upload-to-s3
+atmosphere-cli backups list my-app --limit 50
+atmosphere-cli backups get my-app my-app-1746659903
+atmosphere-cli backups delete my-app my-app-1746659903
 ```
 
 ## Restore Commands
 
 ```bash
-./atmosphere-cli restores start my-app --backup-id my-app-1746659903
-./atmosphere-cli restores start my-app --backup-id my-app-1746659903 --restore-as-new --new-app-name my-app-restore
-./atmosphere-cli restores fresh --source-app my-app --backup-id my-app-1746659903 --app-name my-app
-./atmosphere-cli restores get my-app my-app-1746660020
+atmosphere-cli restores start my-app --backup-id my-app-1746659903
+atmosphere-cli restores start my-app --backup-id my-app-1746659903 --restore-as-new --new-app-name my-app-restore
+atmosphere-cli restores fresh --source-app my-app --backup-id my-app-1746659903 --app-name my-app
+atmosphere-cli restores get my-app my-app-1746660020
 ```
 
 ## Template Commands
 
 ```bash
-./atmosphere-cli templates list
-./atmosphere-cli templates get wordpress
-./atmosphere-cli templates provision wordpress --file provision.json
+atmosphere-cli templates list
+atmosphere-cli templates get wordpress
+atmosphere-cli templates provision wordpress --file provision.json
 ```
 
 ## JSON Input

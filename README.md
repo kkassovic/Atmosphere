@@ -112,15 +112,13 @@ Key configuration options:
 
 ### CLI Wrapper
 
-A Go CLI wrapper is available for the API:
+A Go CLI wrapper is installed with the standard atmosphere install and is available immediately after setup:
 
 ```bash
-cd backend
-go build -o atmosphere-cli ./cmd/atmosphere-cli
-./atmosphere-cli apps list
+atmosphere-cli apps list
 ```
 
-Full command reference: `docs/CLI.md`
+If you are developing from source and need to build it manually, see `docs/CLI.md`.
 
 ### API Endpoints
 
