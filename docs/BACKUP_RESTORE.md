@@ -123,6 +123,11 @@ curl -X POST http://localhost:3000/api/v1/apps/my-app/restores \
 Optional restore fields:
 - `restore_as_new` (boolean)
 - `new_app_name` (required when `restore_as_new=true`)
+- `strict` (boolean, default `true`)
+
+Restore strictness:
+- `strict=true` (default): fail restore on preflight/runtime validation errors
+- `strict=false`: continue restore in best-effort mode and record warnings in restore log
 
 Example response (`202 Accepted`):
 
@@ -151,7 +156,8 @@ curl -X POST http://localhost:3000/api/v1/apps/openproject/restores \
   -d '{
     "backup_id": "openproject-1746659903",
     "restore_as_new": true,
-    "new_app_name": "openproject-restore"
+    "new_app_name": "openproject-restore",
+    "strict": false
   }'
 ```
 
@@ -171,7 +177,8 @@ curl -X POST http://localhost:3000/api/v1/restores/fresh \
   -d '{
     "source_app": "openproject",
     "backup_id": "my-app-1746659903",
-    "app_name": "openproject"
+    "app_name": "openproject",
+    "strict": true
   }'
 ```
 
@@ -179,7 +186,11 @@ Behavior:
 - downloads the backup from storage using `source_app` and `backup_id`
 - recreates the app from `metadata.json`
 - restores workspace, deployment key, and volumes into the new app
+- runs restore preflight checks for workspace/build files before deployment
+- validates volume mapping and warns when custom volume names cannot be safely remapped
 - deploys from the restored workspace snapshot (no Git clone/fetch/pull)
+- verifies post-deploy container runtime state and surfaces unhealthy/exited containers in restore logs
+- applies strictness mode (`strict=true` fail-fast, `strict=false` best-effort with warnings)
 - keeps the existing app-scoped restore flow unchanged
 
 ## Check Restore Status
@@ -246,6 +257,32 @@ docker info
 1. Check app container logs
 2. Verify external dependencies (database, DNS, secrets)
 3. Trigger a redeploy if your app needs rebuild/restart logic after data restore
+
+### Restore fails during preflight
+
+Common preflight failures:
+1. Compose app restore cannot find compose file in restored workspace
+2. Dockerfile app restore cannot find Dockerfile path from metadata
+3. Restored build directory is missing (for example, wrong `github_subdir` in backup metadata)
+
+Fix:
+1. Inspect restore `log` for exact missing path
+2. Verify backup `workspace.tar.gz` includes required build files
+3. Recreate backup after correcting app build path configuration
+
+### Restore fails on runtime validation
+
+Atmosphere now validates container runtime state after restore deployment.
+
+Validation fails if:
+1. no app containers are discovered
+2. one or more containers exit immediately
+3. one or more containers report non-healthy Docker health status
+
+Fix:
+1. Check failing container names in restore `log`
+2. Review application logs and env/secret wiring
+3. Confirm destination host has required external services reachable
 
 ### `backup not found` or `restore not found`
 

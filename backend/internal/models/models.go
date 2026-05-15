@@ -176,6 +176,7 @@ type CreateAppRestoreRequest struct {
 	SourceApp     string `json:"source_app,omitempty"`      // Original app name (for S3 backups)
 	RestoreAsNew  bool   `json:"restore_as_new,omitempty"`
 	NewAppName    string `json:"new_app_name,omitempty"`
+	Strict        *bool  `json:"strict,omitempty"` // Default true. When false, continue with warnings for validation-only failures.
 }
 
 // CreateFreshAppRestoreRequest restores a backup into a new app on a fresh machine.
@@ -183,6 +184,7 @@ type CreateFreshAppRestoreRequest struct {
 	SourceApp string `json:"source_app"`
 	BackupID  string `json:"backup_id"`
 	AppName   string `json:"app_name,omitempty"`
+	Strict    *bool  `json:"strict,omitempty"` // Default true. When false, continue with warnings for validation-only failures.
 }
 
 // CreateAppBackupRequest starts a backup for an app

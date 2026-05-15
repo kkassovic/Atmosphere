@@ -115,7 +115,7 @@ func (s *AppService) DeleteAppBackup(name string, backupID string) error {
 }
 
 // StartAppRestore starts an asynchronous restore for one app from one backup.
-func (s *AppService) StartAppRestore(name, backupID, sourceApp string, restoreAsNew bool, newAppName string) (*models.AppRestore, error) {
+func (s *AppService) StartAppRestore(name, backupID, sourceApp string, restoreAsNew bool, newAppName string, strict bool) (*models.AppRestore, error) {
 	app, err := s.GetApp(name)
 	if err != nil {
 		return nil, err
@@ -199,13 +199,13 @@ func (s *AppService) StartAppRestore(name, backupID, sourceApp string, restoreAs
 		return nil, fmt.Errorf("failed to create app restore record: %w", err)
 	}
 
-	go s.runAppRestore(app, targetApp, backup, restore, restoreAsNew, false)
+	go s.runAppRestore(app, targetApp, backup, restore, restoreAsNew, false, strict)
 
 	return restore, nil
 }
 
 // StartFreshAppRestore restores a backup from storage into a new app on a fresh machine.
-func (s *AppService) StartFreshAppRestore(sourceAppName, backupID, targetAppName string) (*models.AppRestore, error) {
+func (s *AppService) StartFreshAppRestore(sourceAppName, backupID, targetAppName string, strict bool) (*models.AppRestore, error) {
 	if s.backupStorage == nil {
 		return nil, fmt.Errorf("backup storage is required")
 	}
@@ -299,7 +299,7 @@ func (s *AppService) StartFreshAppRestore(sourceAppName, backupID, targetAppName
 		Path:     localPath,
 		Status:   "success",
 	}
-	go s.runAppRestore(&sourceApp, app, backup, restore, targetAppName != sourceApp.Name, true)
+	go s.runAppRestore(&sourceApp, app, backup, restore, targetAppName != sourceApp.Name, true, strict)
 
 	return restore, nil
 }
@@ -429,12 +429,18 @@ func (s *AppService) runAppBackup(app *models.App, backup *models.AppBackup, upl
 	_ = s.repo.UpdateAppBackup(backup)
 }
 
-func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App, backup *models.AppBackup, restore *models.AppRestore, restoreAsNew bool, deployFromSnapshot bool) {
+func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App, backup *models.AppBackup, restore *models.AppRestore, restoreAsNew bool, deployFromSnapshot bool, strict bool) {
 	var logBuilder strings.Builder
 	ctx := context.Background()
 
 	appendLog := func(line string) {
 		logBuilder.WriteString(fmt.Sprintf("[%s] %s\n", time.Now().Format("15:04:05"), line))
+	}
+
+	if strict {
+		appendLog("Restore strict mode: enabled")
+	} else {
+		appendLog("Restore strict mode: disabled (best-effort)")
 	}
 
 	appendLog(fmt.Sprintf("Starting restore for app %s from %s", targetApp.Name, backup.BackupID))
@@ -512,8 +518,22 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 	entries, err := os.ReadDir(volumesDir)
 	if err == nil {
 		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+
+		volumeRestorePlan, err := validateVolumeRestorePlan(entries, sourceApp.Name, targetApp.Name, restoreAsNew, strict)
+		if err != nil {
+			s.finishRestoreWithError(restore, &logBuilder, err)
+			return
+		}
+		for _, warning := range volumeRestorePlan.Warnings {
+			appendLog("Volume mapping warning: " + warning)
+		}
+
 		for _, entry := range entries {
 			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".tar.gz") {
+				continue
+			}
+			if volumeRestorePlan.ShouldSkipArchive(entry.Name()) {
+				appendLog(fmt.Sprintf("Skipping volume archive %s due to mapping collision in best-effort mode", entry.Name()))
 				continue
 			}
 			sourceVolumeName := restoreVolumeNameFromArchive(entry.Name())
@@ -545,12 +565,29 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 	}
 
 	if deployFromSnapshot {
+		if err := s.validateRestoreWorkspace(targetApp); err != nil {
+			if strict {
+				s.finishRestoreWithError(restore, &logBuilder, err)
+				return
+			}
+			appendLog(fmt.Sprintf("Warning: restore preflight check failed in best-effort mode: %v", err))
+		}
+
 		appendLog("Deploying restored app from workspace snapshot (no Git sync)")
 		deployLog, err := s.deploymentService.DeployFromWorkspace(ctx, targetApp)
 		logBuilder.WriteString(deployLog)
 		if err != nil {
 			s.finishRestoreWithError(restore, &logBuilder, err)
 			return
+		}
+
+		appendLog("Validating restored containers runtime state")
+		if err := s.verifyRestoreRuntimeHealth(ctx, targetApp, appendLog); err != nil {
+			if strict {
+				s.finishRestoreWithError(restore, &logBuilder, err)
+				return
+			}
+			appendLog(fmt.Sprintf("Warning: post-restore runtime validation failed in best-effort mode: %v", err))
 		}
 
 		now := time.Now()
@@ -843,7 +880,7 @@ func restoreDockerVolume(ctx context.Context, volumeName, sourceFile string) err
 		"busybox",
 		"sh",
 		"-c",
-		fmt.Sprintf("mkdir -p /target && tar -xzf /backup/%s -C /target", archiveName),
+		fmt.Sprintf("mkdir -p /target && rm -rf /target/* /target/.[!.]* /target/..?* 2>/dev/null || true; tar -xzf /backup/%s -C /target", archiveName),
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -866,4 +903,124 @@ func mapVolumeNameForRestore(sourceVolumeName, sourceAppName, targetAppName stri
 
 	// Fallback replacement for custom names containing source app name.
 	return strings.ReplaceAll(sourceVolumeName, sourceAppName, targetAppName)
+}
+
+type volumeRestorePlan struct {
+	Warnings       []string
+	skippedArchive map[string]struct{}
+}
+
+func (p *volumeRestorePlan) ShouldSkipArchive(archiveName string) bool {
+	if p == nil || len(p.skippedArchive) == 0 {
+		return false
+	}
+	_, exists := p.skippedArchive[archiveName]
+	return exists
+}
+
+func validateVolumeRestorePlan(entries []os.DirEntry, sourceAppName, targetAppName string, restoreAsNew bool, strict bool) (*volumeRestorePlan, error) {
+	plan := &volumeRestorePlan{}
+	targetToSource := make(map[string]string)
+	plan.skippedArchive = make(map[string]struct{})
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".tar.gz") {
+			continue
+		}
+
+		sourceVolumeName := restoreVolumeNameFromArchive(entry.Name())
+		if sourceVolumeName == "" {
+			continue
+		}
+
+		targetVolumeName := mapVolumeNameForRestore(sourceVolumeName, sourceAppName, targetAppName, restoreAsNew)
+		if existingSource, exists := targetToSource[targetVolumeName]; exists && existingSource != sourceVolumeName {
+			if !strict {
+				plan.Warnings = append(plan.Warnings, fmt.Sprintf("ambiguous volume mapping: %s and %s both map to %s; keeping first and skipping archive %s", existingSource, sourceVolumeName, targetVolumeName, entry.Name()))
+				plan.skippedArchive[entry.Name()] = struct{}{}
+				continue
+			}
+			return nil, fmt.Errorf(
+				"ambiguous volume mapping: source volumes %s and %s both map to target volume %s",
+				existingSource,
+				sourceVolumeName,
+				targetVolumeName,
+			)
+		}
+		targetToSource[targetVolumeName] = sourceVolumeName
+
+		if restoreAsNew && sourceAppName != targetAppName && targetVolumeName == sourceVolumeName {
+			plan.Warnings = append(plan.Warnings, fmt.Sprintf("%s kept original name (external/custom volume naming may collide on shared host)", sourceVolumeName))
+		}
+	}
+
+	sort.Strings(plan.Warnings)
+	return plan, nil
+}
+
+func (s *AppService) validateRestoreWorkspace(app *models.App) error {
+	workspaceDir := filepath.Join(s.cfg.WorkspacesDir, app.Name)
+	if _, err := os.Stat(workspaceDir); err != nil {
+		return fmt.Errorf("restored workspace missing at %s: %w", workspaceDir, err)
+	}
+
+	buildDir := workspaceDir
+	if app.GitHubSubdir != "" {
+		buildDir = filepath.Join(workspaceDir, app.GitHubSubdir)
+	}
+
+	if _, err := os.Stat(buildDir); err != nil {
+		return fmt.Errorf("restored build directory missing at %s: %w", buildDir, err)
+	}
+
+	if app.BuildType == "compose" {
+		var composePath string
+		if app.ComposePath != "" {
+			composePath = filepath.Join(buildDir, app.ComposePath)
+		} else {
+			composePath = s.deploymentService.DetectComposeFile(buildDir)
+		}
+		if composePath == "" {
+			return fmt.Errorf("restore preflight failed: no compose file found in %s", buildDir)
+		}
+		if _, err := os.Stat(composePath); err != nil {
+			return fmt.Errorf("restore preflight failed: compose file missing at %s: %w", composePath, err)
+		}
+		return nil
+	}
+
+	dockerfilePath := filepath.Join(buildDir, "Dockerfile")
+	if app.DockerfilePath != "" {
+		dockerfilePath = filepath.Join(buildDir, app.DockerfilePath)
+	}
+	if _, err := os.Stat(dockerfilePath); err != nil {
+		return fmt.Errorf("restore preflight failed: Dockerfile missing at %s: %w", dockerfilePath, err)
+	}
+
+	return nil
+}
+
+func (s *AppService) verifyRestoreRuntimeHealth(ctx context.Context, app *models.App, appendLog func(string)) error {
+	const maxAttempts = 6
+	const attemptDelay = 2 * time.Second
+
+	var lastIssues []string
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		issues, err := s.deploymentService.dockerService.GetAppRuntimeIssues(ctx, app.Name)
+		if err != nil {
+			return fmt.Errorf("post-restore runtime check failed: %w", err)
+		}
+		if len(issues) == 0 {
+			appendLog("Container runtime validation passed")
+			return nil
+		}
+
+		lastIssues = issues
+		appendLog(fmt.Sprintf("Runtime validation attempt %d/%d found issues: %s", attempt, maxAttempts, strings.Join(issues, "; ")))
+		if attempt < maxAttempts {
+			time.Sleep(attemptDelay)
+		}
+	}
+
+	return fmt.Errorf("post-restore runtime validation failed: %s", strings.Join(lastIssues, "; "))
 }

@@ -284,7 +284,12 @@ func (h *Handler) StartAppRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restore, err := h.appService.StartAppRestore(name, req.BackupID, req.SourceApp, req.RestoreAsNew, req.NewAppName)
+	strict := true
+	if req.Strict != nil {
+		strict = *req.Strict
+	}
+
+	restore, err := h.appService.StartAppRestore(name, req.BackupID, req.SourceApp, req.RestoreAsNew, req.NewAppName, strict)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return
@@ -312,7 +317,12 @@ func (h *Handler) StartFreshAppRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restore, err := h.appService.StartFreshAppRestore(req.SourceApp, req.BackupID, req.AppName)
+	strict := true
+	if req.Strict != nil {
+		strict = *req.Strict
+	}
+
+	restore, err := h.appService.StartFreshAppRestore(req.SourceApp, req.BackupID, req.AppName, strict)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
 		return

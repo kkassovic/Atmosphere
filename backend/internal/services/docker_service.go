@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -265,6 +266,80 @@ func (s *DockerService) GetVolumeNamesByApp(ctx context.Context, appName string)
 	sort.Strings(volumes)
 
 	return volumes, nil
+}
+
+// GetAppRuntimeIssues inspects app containers and returns runtime issues.
+func (s *DockerService) GetAppRuntimeIssues(ctx context.Context, appName string) ([]string, error) {
+	containersByAppLabel, err := s.GetContainersByLabel(ctx, "atmosphere.app", appName)
+	if err != nil {
+		return nil, err
+	}
+
+	projectName := fmt.Sprintf("atmosphere-%s", appName)
+	containersByComposeProject, err := s.GetContainersByComposeProject(ctx, projectName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list compose project containers: %w", err)
+	}
+
+	containersByNamePrefix, err := s.GetContainersByNamePrefix(ctx, appName+"-")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers by name prefix: %w", err)
+	}
+
+	containerByID := make(map[string]types.Container)
+	for _, c := range containersByAppLabel {
+		containerByID[c.ID] = c
+	}
+	for _, c := range containersByComposeProject {
+		containerByID[c.ID] = c
+	}
+	for _, c := range containersByNamePrefix {
+		containerByID[c.ID] = c
+	}
+
+	if len(containerByID) == 0 {
+		return []string{fmt.Sprintf("no containers found for app %s", appName)}, nil
+	}
+
+	issues := []string{}
+	for _, c := range containerByID {
+		inspect, err := s.client.ContainerInspect(ctx, c.ID)
+		if err != nil {
+			issues = append(issues, fmt.Sprintf("failed to inspect container %s: %v", c.ID[:12], err))
+			continue
+		}
+
+		containerName := strings.TrimPrefix(inspect.Name, "/")
+		if containerName == "" {
+			containerName = c.ID[:12]
+		}
+
+		if inspect.State == nil {
+			issues = append(issues, fmt.Sprintf("container %s has empty runtime state", containerName))
+			continue
+		}
+
+		if !inspect.State.Running {
+			issues = append(issues, fmt.Sprintf(
+				"container %s is not running (status=%s exit_code=%d error=%s)",
+				containerName,
+				inspect.State.Status,
+				inspect.State.ExitCode,
+				inspect.State.Error,
+			))
+			continue
+		}
+
+		if inspect.State.Health != nil {
+			healthStatus := inspect.State.Health.Status
+			if healthStatus != "" && healthStatus != "healthy" {
+				issues = append(issues, fmt.Sprintf("container %s health is %s", containerName, healthStatus))
+			}
+		}
+	}
+
+	sort.Strings(issues)
+	return issues, nil
 }
 
 // GenerateTraefikLabels generates Traefik labels for a container
