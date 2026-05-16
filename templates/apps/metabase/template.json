@@ -1,0 +1,15 @@
+{
+  "id": "metabase",
+  "name": "Metabase",
+  "description": "Open-source business intelligence and analytics",
+  "deployment_type": "manual",
+  "build_type": "compose",
+  "compose_path": "docker-compose.yml",
+  "port": 3000,
+  "inputs": [],
+  "default_env": {},
+  "metadata": {
+    "category": "analytics",
+    "sample_provision_curl": "curl -X POST http://localhost:3000/api/v1/templates/metabase/provision -H \"Content-Type: application/json\" -d '{\"app_name\":\"my-metabase\",\"domains\":[\"bi.example.com\"],\"inputs\":{},\"env_vars\":{},\"auto_deploy\":true}'"
+  }
+}

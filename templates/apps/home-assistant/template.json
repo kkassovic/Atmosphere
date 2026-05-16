@@ -1,0 +1,25 @@
+{
+  "id": "home-assistant",
+  "name": "Home Assistant",
+  "description": "Open-source home automation platform",
+  "deployment_type": "manual",
+  "build_type": "compose",
+  "compose_path": "docker-compose.yml",
+  "port": 8123,
+  "inputs": [
+    {
+      "name": "tz",
+      "label": "Timezone",
+      "type": "string",
+      "required": false,
+      "default": "UTC"
+    }
+  ],
+  "default_env": {
+    "TZ": "{{tz}}"
+  },
+  "metadata": {
+    "category": "iot",
+    "sample_provision_curl": "curl -X POST http://localhost:3000/api/v1/templates/home-assistant/provision -H \"Content-Type: application/json\" -d '{\"app_name\":\"my-home-assistant\",\"domains\":[\"ha.example.com\"],\"inputs\":{\"tz\":\"UTC\"},\"env_vars\":{},\"auto_deploy\":true}'"
+  }
+}

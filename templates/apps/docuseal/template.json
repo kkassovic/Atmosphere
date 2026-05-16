@@ -1,0 +1,24 @@
+{
+  "id": "docuseal",
+  "name": "DocuSeal",
+  "description": "Open-source document signing platform",
+  "deployment_type": "manual",
+  "build_type": "compose",
+  "compose_path": "docker-compose.yml",
+  "port": 3000,
+  "inputs": [
+    {
+      "name": "secret_key_base",
+      "label": "Secret Key Base",
+      "type": "secret",
+      "required": true
+    }
+  ],
+  "default_env": {
+    "SECRET_KEY_BASE": "{{secret_key_base}}"
+  },
+  "metadata": {
+    "category": "productivity",
+    "sample_provision_curl": "curl -X POST http://localhost:3000/api/v1/templates/docuseal/provision -H \"Content-Type: application/json\" -d '{\"app_name\":\"my-docuseal\",\"domains\":[\"sign.example.com\"],\"inputs\":{\"secret_key_base\":\"replace-with-long-random-secret\"},\"env_vars\":{},\"auto_deploy\":true}'"
+  }
+}

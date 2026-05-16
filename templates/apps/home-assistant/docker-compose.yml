@@ -1,0 +1,27 @@
+services:
+  home-assistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.entrypoints=websecure"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.tls=true"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.tls.certresolver=letsencrypt"
+      - "traefik.http.services.${ATMOSPHERE_APP}.loadbalancer.server.port=8123"
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+      - home_assistant_config:/config
+    networks:
+      - default
+      - traefik
+
+volumes:
+  home_assistant_config:
+
+networks:
+  default:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}
