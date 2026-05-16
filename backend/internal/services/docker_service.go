@@ -268,19 +268,45 @@ func (s *DockerService) GetVolumeNamesByApp(ctx context.Context, appName string)
 	return volumes, nil
 }
 
-// ListAllAtmosphereContainers returns all containers bearing the atmosphere.app label (any value).
+// ListAllAtmosphereContainers returns all containers managed by Atmosphere.
+// This includes containers bearing the atmosphere.app label (single-container deployments)
+// as well as containers belonging to atmosphere compose projects
+// (com.docker.compose.project starting with "atmosphere-").
 func (s *DockerService) ListAllAtmosphereContainers(ctx context.Context) ([]types.Container, error) {
-	filterArgs := filters.NewArgs()
-	filterArgs.Add("label", "atmosphere.app")
+	// Query 1: containers with the atmosphere.app label (single-container deployments).
+	labelFilterArgs := filters.NewArgs()
+	labelFilterArgs.Add("label", "atmosphere.app")
 
-	containers, err := s.client.ContainerList(ctx, container.ListOptions{
+	byLabel, err := s.client.ContainerList(ctx, container.ListOptions{
 		All:     true,
-		Filters: filterArgs,
+		Filters: labelFilterArgs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list atmosphere containers: %w", err)
 	}
-	return containers, nil
+
+	// Query 2: all containers, filtered in-process by compose project prefix.
+	// Docker's label filter doesn't support prefix matching, so we must do this ourselves.
+	all, err := s.client.ContainerList(ctx, container.ListOptions{All: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list all containers: %w", err)
+	}
+
+	seen := make(map[string]struct{}, len(byLabel))
+	result := make([]types.Container, 0, len(byLabel))
+	for _, c := range byLabel {
+		seen[c.ID] = struct{}{}
+		result = append(result, c)
+	}
+	for _, c := range all {
+		if _, ok := seen[c.ID]; ok {
+			continue
+		}
+		if strings.HasPrefix(c.Labels["com.docker.compose.project"], "atmosphere-") {
+			result = append(result, c)
+		}
+	}
+	return result, nil
 }
 
 // ListAllAtmosphereVolumes returns all named Docker volumes associated with atmosphere compose projects.
