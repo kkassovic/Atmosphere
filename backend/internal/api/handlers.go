@@ -14,13 +14,15 @@ import (
 
 // Handler handles HTTP requests
 type Handler struct {
-	appService *services.AppService
+	appService   *services.AppService
+	resetService *services.ResetService
 }
 
 // NewHandler creates a new handler
-func NewHandler(appService *services.AppService) *Handler {
+func NewHandler(appService *services.AppService, resetService *services.ResetService) *Handler {
 	return &Handler{
-		appService: appService,
+		appService:   appService,
+		resetService: resetService,
 	}
 }
 
@@ -512,6 +514,28 @@ func (h *Handler) ProvisionTemplate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusCreated, resp)
+}
+
+// HardReset handles POST /api/v1/system/hard-reset
+// Requires {"confirm": true} in the request body.
+// Deletes all containers, volumes, workspaces, keys, logs, and the database.
+// *.ini files and S3 backups are preserved.
+func (h *Handler) HardReset(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Confirm bool `json:"confirm"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !req.Confirm {
+		respondError(w, http.StatusBadRequest, `hard reset requires {"confirm": true} in request body`)
+		return
+	}
+
+	result, err := h.resetService.HardReset(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
 }
 
 // Helper functions for responses

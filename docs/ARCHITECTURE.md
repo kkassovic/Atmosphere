@@ -85,8 +85,12 @@ internal/
   ├── repository/        - Data access layer (CRUD operations)
   ├── services/          - Business logic layer
   │   ├── app_service.go         - App lifecycle management
+  │   ├── backup_service.go      - Backup and restore operations
+  │   ├── backup_scheduler.go    - Recurring backup scheduling
   │   ├── deployment_service.go  - Deployment orchestration
-  │   └── docker_service.go      - Docker API wrapper
+  │   ├── docker_service.go      - Docker API wrapper
+  │   ├── reset_service.go       - Hard reset (wipe all data)
+  │   └── template_service.go    - App template provisioning
   └── api/               - HTTP layer
       ├── routes.go      - Route definitions
       └── handlers.go    - HTTP handlers

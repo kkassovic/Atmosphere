@@ -268,6 +268,38 @@ func (s *DockerService) GetVolumeNamesByApp(ctx context.Context, appName string)
 	return volumes, nil
 }
 
+// ListAllAtmosphereContainers returns all containers bearing the atmosphere.app label (any value).
+func (s *DockerService) ListAllAtmosphereContainers(ctx context.Context) ([]types.Container, error) {
+	filterArgs := filters.NewArgs()
+	filterArgs.Add("label", "atmosphere.app")
+
+	containers, err := s.client.ContainerList(ctx, container.ListOptions{
+		All:     true,
+		Filters: filterArgs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list atmosphere containers: %w", err)
+	}
+	return containers, nil
+}
+
+// ListAllAtmosphereVolumes returns all named Docker volumes associated with atmosphere compose projects.
+func (s *DockerService) ListAllAtmosphereVolumes(ctx context.Context) ([]string, error) {
+	resp, err := s.client.VolumeList(ctx, volume.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list volumes: %w", err)
+	}
+
+	var names []string
+	for _, v := range resp.Volumes {
+		project := v.Labels["com.docker.compose.project"]
+		if strings.HasPrefix(project, "atmosphere-") {
+			names = append(names, v.Name)
+		}
+	}
+	return names, nil
+}
+
 // GetAppRuntimeIssues inspects app containers and returns runtime issues.
 func (s *DockerService) GetAppRuntimeIssues(ctx context.Context, appName string) ([]string, error) {
 	containersByAppLabel, err := s.GetContainersByLabel(ctx, "atmosphere.app", appName)

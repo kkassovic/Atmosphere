@@ -275,3 +275,22 @@ curl -X PUT http://localhost:3000/api/v1/apps/reopen3 \
     }
   }'
 ```
+
+---
+
+## Hard Reset (Wipe Everything)
+
+Permanently deletes all containers, volumes, workspaces, keys, logs, local backups, and the database. `*.ini` files and S3 backups are preserved. The server must be restarted afterwards.
+
+```bash
+# CLI
+atmosphere-cli system hard-reset --confirm
+
+# API
+curl -X POST http://localhost:3000/api/v1/system/hard-reset \
+  -H "Content-Type: application/json" \
+  -d '{"confirm": true}'
+
+# Restart the server after reset
+systemctl restart atmosphere
+```

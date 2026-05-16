@@ -535,6 +535,52 @@ curl -X POST http://localhost:3000/api/v1/apps/my-app/destroy
 - ✅ App runtime configuration reset
 - ✅ Backup artifacts and backup records preserved
 
+### Hard Reset (Wipe Entire Instance)
+
+Destroys every app, all containers, all volumes, all workspaces, all logs, all local backups, and the database in a single operation. Use this to fully start over.
+
+```bash
+# CLI (--confirm required)
+atmosphere-cli system hard-reset --confirm
+
+# API
+curl -X POST http://localhost:3000/api/v1/system/hard-reset \
+  -H "Content-Type: application/json" \
+  -d '{"confirm": true}'
+```
+
+**Response:**
+```json
+{
+  "containers_removed": 4,
+  "volumes_removed": 6,
+  "dirs_wiped": [
+    "/opt/atmosphere/workspaces",
+    "/opt/atmosphere/keys",
+    "/opt/atmosphere/logs"
+  ],
+  "database_deleted": true,
+  "ini_files_preserved": 0
+}
+```
+
+**What hard reset deletes:**
+- ✅ All atmosphere containers (force-removed)
+- ✅ All atmosphere Docker volumes
+- ✅ All workspace directories
+- ✅ All SSH deployment keys
+- ✅ All logs and local backup archives
+- ✅ The SQLite database
+
+**What is preserved:**
+- ✅ Any `*.ini` files inside managed directories
+- ✅ S3 backups — never touched
+
+**After a hard reset**, restart the server to initialise a fresh database:
+```bash
+systemctl restart atmosphere
+```
+
 ### Before Deleting
 
 **Consider:**

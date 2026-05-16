@@ -68,9 +68,10 @@ func main() {
 
 	appService := services.NewAppService(appRepo, cfg, deploymentService, backupStorage)
 	backupScheduler := services.NewBackupScheduler(appRepo, appService, cfg)
+	resetService := services.NewResetService(cfg, dockerService)
 
 	// Initialize router
-	router := api.NewRouter(appService)
+	router := api.NewRouter(appService, resetService)
 
 	// Create HTTP server
 	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)

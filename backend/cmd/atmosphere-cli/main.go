@@ -57,6 +57,8 @@ func run(c *apiClient, args []string) error {
 		return runRestores(c, args[1:])
 	case "templates":
 		return runTemplates(c, args[1:])
+	case "system":
+		return runSystem(c, args[1:])
 	default:
 		printUsage()
 		return fmt.Errorf("unknown command: %s", args[0])
@@ -255,8 +257,35 @@ func runRestores(c *apiClient, args []string) error {
 	}
 }
 
-func runTemplates(c *apiClient, args []string) error {
+func runSystem(c *apiClient, args []string) error {
 	if len(args) == 0 {
+		printSystemUsage()
+		return errors.New("system subcommand required")
+	}
+
+	switch args[0] {
+	case "hard-reset":
+		fs := flag.NewFlagSet("system hard-reset", flag.ContinueOnError)
+		fs.SetOutput(io.Discard)
+		confirm := fs.Bool("confirm", false, "Required: confirm destructive hard reset")
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		if !*confirm {
+			return errors.New("--confirm flag is required for hard reset (this is irreversible)")
+		}
+		body, err := json.Marshal(map[string]bool{"confirm": true})
+		if err != nil {
+			return err
+		}
+		return c.requestAndPrint(http.MethodPost, "/api/v1/system/hard-reset", body)
+	default:
+		printSystemUsage()
+		return fmt.Errorf("unknown system subcommand: %s", args[0])
+	}
+}
+
+func runTemplates(c *apiClient, args []string) error {	if len(args) == 0 {
 		printTemplatesUsage()
 		return errors.New("templates subcommand required")
 	}
@@ -395,6 +424,7 @@ func printUsage() {
 	fmt.Println("  backups    Manage app backups")
 	fmt.Println("  restores   Start and inspect restores")
 	fmt.Println("  templates  Template operations")
+	fmt.Println("  system     System-level operations")
 	fmt.Println()
 	fmt.Println("Run with a command only to see command-specific usage, for example:")
 	fmt.Println("  atmosphere-cli apps")
@@ -434,4 +464,14 @@ func printTemplatesUsage() {
 	fmt.Println("  templates list")
 	fmt.Println("  templates get <id>")
 	fmt.Println("  templates provision <id> --json <payload> | --file <path>")
+}
+
+func printSystemUsage() {
+	fmt.Println("system commands:")
+	fmt.Println("  system hard-reset --confirm")
+	fmt.Println()
+	fmt.Println("  hard-reset  Permanently deletes all containers, volumes, workspaces, keys,")
+	fmt.Println("              logs, local backups, and the database.")
+	fmt.Println("              *.ini files and S3 backups are preserved.")
+	fmt.Println("              The server must be restarted after a hard reset.")
 }

@@ -197,6 +197,40 @@ atmosphere-cli templates get wordpress
 atmosphere-cli templates provision wordpress --file provision.json
 ```
 
+## Template Commands
+
+```bash
+atmosphere-cli templates list
+atmosphere-cli templates get wordpress
+atmosphere-cli templates provision wordpress --file provision.json
+```
+
+## System Commands
+
+```bash
+# Hard reset — permanently wipes all Atmosphere-managed data
+atmosphere-cli system hard-reset --confirm
+```
+
+`--confirm` is mandatory. Without it the command refuses to run.
+
+**What hard reset deletes:**
+- All containers bearing the `atmosphere.app` label (stopped and force-removed)
+- All named Docker volumes from `atmosphere-*` compose projects
+- Contents of `WorkspacesDir` (`/opt/atmosphere/workspaces`)
+- Contents of `KeysDir` (`/opt/atmosphere/keys`)
+- Contents of `LogsDir` (`/opt/atmosphere/logs`) — including local backup archives
+- The SQLite database (`/opt/atmosphere/atmosphere.db`)
+
+**What is preserved:**
+- Any `*.ini` files found inside managed directories
+- S3 backups — never touched
+
+**After a hard reset** the Atmosphere server must be restarted. It will recreate the database and empty directories on next startup:
+```bash
+systemctl restart atmosphere
+```
+
 ## JSON Input
 
 For commands that send a JSON body, use one of:

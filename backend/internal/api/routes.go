@@ -11,7 +11,7 @@ import (
 )
 
 // NewRouter creates and configures the HTTP router
-func NewRouter(appService *services.AppService) http.Handler {
+func NewRouter(appService *services.AppService, resetService *services.ResetService) http.Handler {
 	r := chi.NewRouter()
 
 	// Middleware
@@ -34,9 +34,12 @@ func NewRouter(appService *services.AppService) http.Handler {
 	if appService == nil {
 		panic("app service is required")
 	}
+	if resetService == nil {
+		panic("reset service is required")
+	}
 
 	// Initialize handler
-	handler := NewHandler(appService)
+	handler := NewHandler(appService, resetService)
 
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -89,6 +92,9 @@ func NewRouter(appService *services.AppService) http.Handler {
 
 		// Backup storage health check
 		r.Get("/backup-storage/health", handler.CheckBackupStorageHealth)
+
+		// Hard reset — wipes all data except *.ini files and S3 backups
+		r.Post("/system/hard-reset", handler.HardReset)
 	})
 
 	return r
