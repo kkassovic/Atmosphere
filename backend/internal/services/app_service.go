@@ -7,10 +7,13 @@ import (
 	"atmosphere/internal/storage"
 	"context"
 	"fmt"
+	"github.com/docker/docker/api/types"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -20,6 +23,7 @@ type AppService struct {
 	cfg               *config.Config
 	deploymentService *DeploymentService
 	backupStorage     storage.BackupStorage
+	backupMu          sync.Mutex
 }
 
 // NewAppService creates a new app service
@@ -257,6 +261,91 @@ func (s *AppService) ListApps() ([]*models.App, error) {
 	}
 
 	return visible, nil
+}
+
+// ListAppContainers lists all Docker containers related to one app.
+// Matching sources: atmosphere.app label, compose project name, and app-name prefix.
+func (s *AppService) ListAppContainers(name string) ([]models.AppContainer, error) {
+	app, err := s.GetApp(name)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := context.Background()
+	byLabel, err := s.deploymentService.dockerService.GetContainersByLabel(ctx, "atmosphere.app", app.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers by app label: %w", err)
+	}
+
+	projectName := fmt.Sprintf("atmosphere-%s", app.Name)
+	byProject, err := s.deploymentService.dockerService.GetContainersByComposeProject(ctx, projectName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers by compose project: %w", err)
+	}
+
+	byPrefix, err := s.deploymentService.dockerService.GetContainersByNamePrefix(ctx, app.Name+"-")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers by name prefix: %w", err)
+	}
+
+	itemsByID := make(map[string]*models.AppContainer)
+	add := func(containers []types.Container, matchedBy string) {
+		for _, c := range containers {
+			item, exists := itemsByID[c.ID]
+			if !exists {
+				item = &models.AppContainer{
+					ID:        c.ID,
+					Name:      containerDisplayName(c),
+					Image:     c.Image,
+					State:     c.State,
+					Status:    c.Status,
+					MatchedBy: []string{},
+				}
+				itemsByID[c.ID] = item
+			}
+			if !containsString(item.MatchedBy, matchedBy) {
+				item.MatchedBy = append(item.MatchedBy, matchedBy)
+			}
+		}
+	}
+
+	add(byLabel, "app_label")
+	add(byProject, "compose_project")
+	add(byPrefix, "name_prefix")
+
+	result := make([]models.AppContainer, 0, len(itemsByID))
+	for _, item := range itemsByID {
+		sort.Strings(item.MatchedBy)
+		result = append(result, *item)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Name == result[j].Name {
+			return result[i].ID < result[j].ID
+		}
+		return result[i].Name < result[j].Name
+	})
+
+	return result, nil
+}
+
+func containerDisplayName(c types.Container) string {
+	if len(c.Names) > 0 && c.Names[0] != "" {
+		return strings.TrimPrefix(c.Names[0], "/")
+	}
+	if len(c.ID) > 12 {
+		return c.ID[:12]
+	}
+	return c.ID
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 // UpdateApp updates an existing app

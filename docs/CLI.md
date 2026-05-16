@@ -58,6 +58,7 @@ atmosphere-cli apps update my-app --json '{"domains":["app.example.com"]}'
 atmosphere-cli apps deploy my-app
 atmosphere-cli apps stop my-app
 atmosphere-cli apps start my-app
+atmosphere-cli apps containers my-app
 atmosphere-cli apps delete my-app
 atmosphere-cli apps destroy my-app
 atmosphere-cli apps logs my-app --limit 20
@@ -167,6 +168,7 @@ atmosphere-cli apps create --json "$(jq -n \
 Notes:
 - `apps delete` calls `DELETE /api/v1/apps/{name}`.
 - `apps destroy` calls `POST /api/v1/apps/{name}/destroy` and performs deep wipe while preserving backups.
+- `apps containers` calls `GET /api/v1/apps/{name}/containers` and returns all related containers with `matched_by` metadata (`app_label`, `compose_project`, `name_prefix`).
 
 ## Backup Commands
 
@@ -177,6 +179,10 @@ atmosphere-cli backups list my-app --limit 50
 atmosphere-cli backups get my-app my-app-1746659903
 atmosphere-cli backups delete my-app my-app-1746659903
 ```
+
+Default behavior:
+- Backup now runs in a freeze window. Atmosphere stops all running app-related containers, creates backup artifacts, then restarts the previously running containers.
+- App-related containers are discovered using the same app matching rules as `apps containers`.
 
 ## Restore Commands
 
@@ -215,7 +221,7 @@ atmosphere-cli system hard-reset --confirm
 `--confirm` is mandatory. Without it the command refuses to run.
 
 **What hard reset deletes:**
-- All containers bearing the `atmosphere.app` label (stopped and force-removed)
+- All Atmosphere app-related containers (including compose project containers under `atmosphere-<app>`), stopped and force-removed
 - All named Docker volumes from `atmosphere-*` compose projects
 - Contents of `WorkspacesDir` (`/opt/atmosphere/workspaces`)
 - Contents of `KeysDir` (`/opt/atmosphere/keys`)

@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/docker/docker/api/types"
 	"io"
 	"os"
 	"os/exec"
@@ -337,16 +338,49 @@ func (s *AppService) runAppBackup(app *models.App, backup *models.AppBackup, upl
 	}
 
 	appendLog(fmt.Sprintf("Starting backup for app %s", app.Name))
+	appendLog("Waiting for global backup lock")
+	s.backupMu.Lock()
+	appendLog("Acquired global backup lock")
+	defer s.backupMu.Unlock()
 
-	if err := os.MkdirAll(filepath.Join(backup.Path, "volumes"), 0755); err != nil {
-		s.finishBackupWithError(backup, &logBuilder, fmt.Errorf("failed to create backup directory: %w", err))
+	frozenContainers, err := s.freezeAllManagedContainers(ctx, appendLog)
+	if err != nil {
+		s.finishBackupWithError(backup, &logBuilder, err)
 		return
+	}
+
+	sizeBytes, runErr := s.runAppBackupPayload(ctx, app, backup, uploadToS3, appendLog)
+	restartErr := s.restartFrozenContainers(ctx, frozenContainers, appendLog)
+
+	if restartErr != nil {
+		if runErr != nil {
+			runErr = fmt.Errorf("%w; additionally failed to restart frozen containers: %v", runErr, restartErr)
+		} else {
+			runErr = fmt.Errorf("backup artifacts created, but failed to restart frozen containers: %w", restartErr)
+		}
+	}
+
+	if runErr != nil {
+		s.finishBackupWithError(backup, &logBuilder, runErr)
+		return
+	}
+
+	now := time.Now()
+	backup.Status = "success"
+	backup.SizeBytes = sizeBytes
+	backup.Log = logBuilder.String()
+	backup.CompletedAt = &now
+	_ = s.repo.UpdateAppBackup(backup)
+}
+
+func (s *AppService) runAppBackupPayload(ctx context.Context, app *models.App, backup *models.AppBackup, uploadToS3 bool, appendLog func(string)) (int64, error) {
+	if err := os.MkdirAll(filepath.Join(backup.Path, "volumes"), 0755); err != nil {
+		return 0, fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
 	deploymentLogs, err := s.repo.GetDeploymentLogs(app.ID, 100)
 	if err != nil {
-		s.finishBackupWithError(backup, &logBuilder, fmt.Errorf("failed to load deployment logs: %w", err))
-		return
+		return 0, fmt.Errorf("failed to load deployment logs: %w", err)
 	}
 
 	metadata := map[string]interface{}{
@@ -358,8 +392,7 @@ func (s *AppService) runAppBackup(app *models.App, backup *models.AppBackup, upl
 
 	metadataPath := filepath.Join(backup.Path, "metadata.json")
 	if err := writeJSONFile(metadataPath, metadata); err != nil {
-		s.finishBackupWithError(backup, &logBuilder, fmt.Errorf("failed to write metadata: %w", err))
-		return
+		return 0, fmt.Errorf("failed to write metadata: %w", err)
 	}
 	appendLog("Saved metadata.json")
 
@@ -367,8 +400,7 @@ func (s *AppService) runAppBackup(app *models.App, backup *models.AppBackup, upl
 	if _, err := os.Stat(workspaceDir); err == nil {
 		workspaceArchive := filepath.Join(backup.Path, "workspace.tar.gz")
 		if err := tarGzDirectory(workspaceDir, workspaceArchive); err != nil {
-			s.finishBackupWithError(backup, &logBuilder, fmt.Errorf("failed to archive workspace: %w", err))
-			return
+			return 0, fmt.Errorf("failed to archive workspace: %w", err)
 		}
 		appendLog("Archived workspace")
 	}
@@ -377,32 +409,28 @@ func (s *AppService) runAppBackup(app *models.App, backup *models.AppBackup, upl
 	if _, err := os.Stat(keyPath); err == nil {
 		backupKeyPath := filepath.Join(backup.Path, "deployment.key")
 		if err := copyFile(keyPath, backupKeyPath, 0600); err != nil {
-			s.finishBackupWithError(backup, &logBuilder, fmt.Errorf("failed to copy deployment key: %w", err))
-			return
+			return 0, fmt.Errorf("failed to copy deployment key: %w", err)
 		}
 		appendLog("Copied deployment key")
 	}
 
 	volumeNames, err := s.deploymentService.dockerService.GetVolumeNamesByApp(ctx, app.Name)
 	if err != nil {
-		s.finishBackupWithError(backup, &logBuilder, fmt.Errorf("failed to discover app volumes: %w", err))
-		return
+		return 0, fmt.Errorf("failed to discover app volumes: %w", err)
 	}
 
 	for _, volumeName := range volumeNames {
 		fileName := sanitizeVolumeArchiveName(volumeName)
 		targetFile := filepath.Join(backup.Path, "volumes", fileName)
 		if err := backupDockerVolume(ctx, volumeName, targetFile); err != nil {
-			s.finishBackupWithError(backup, &logBuilder, fmt.Errorf("failed to backup volume %s: %w", volumeName, err))
-			return
+			return 0, fmt.Errorf("failed to backup volume %s: %w", volumeName, err)
 		}
 		appendLog(fmt.Sprintf("Backed up volume %s", volumeName))
 	}
 
 	sizeBytes, err := directorySize(backup.Path)
 	if err != nil {
-		s.finishBackupWithError(backup, &logBuilder, fmt.Errorf("failed to calculate backup size: %w", err))
-		return
+		return 0, fmt.Errorf("failed to calculate backup size: %w", err)
 	}
 
 	// Upload to S3 if requested
@@ -421,12 +449,115 @@ func (s *AppService) runAppBackup(app *models.App, backup *models.AppBackup, upl
 		}
 	}
 
-	now := time.Now()
-	backup.Status = "success"
-	backup.SizeBytes = sizeBytes
-	backup.Log = logBuilder.String()
-	backup.CompletedAt = &now
-	_ = s.repo.UpdateAppBackup(backup)
+	return sizeBytes, nil
+}
+
+type frozenContainer struct {
+	ID   string
+	Name string
+}
+
+func (s *AppService) freezeAllManagedContainers(ctx context.Context, appendLog func(string)) ([]frozenContainer, error) {
+	apps, err := s.repo.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list apps for backup freeze: %w", err)
+	}
+
+	containerByID := make(map[string]frozenContainer)
+	for _, app := range apps {
+		if app == nil || app.Name == "" || s.isDestroyedApp(app) {
+			continue
+		}
+
+		containersByAppLabel, err := s.deploymentService.dockerService.GetContainersByLabel(ctx, "atmosphere.app", app.Name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list containers by app label for %s: %w", app.Name, err)
+		}
+
+		projectName := fmt.Sprintf("atmosphere-%s", app.Name)
+		containersByComposeProject, err := s.deploymentService.dockerService.GetContainersByComposeProject(ctx, projectName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list compose project containers for %s: %w", app.Name, err)
+		}
+
+		containersByNamePrefix, err := s.deploymentService.dockerService.GetContainersByNamePrefix(ctx, app.Name+"-")
+		if err != nil {
+			return nil, fmt.Errorf("failed to list containers by name prefix for %s: %w", app.Name, err)
+		}
+
+		groups := [][]types.Container{containersByAppLabel, containersByComposeProject, containersByNamePrefix}
+		for _, group := range groups {
+			for _, c := range group {
+				if c.State != "running" {
+					continue
+				}
+				if _, exists := containerByID[c.ID]; exists {
+					continue
+				}
+				name := c.ID
+				if len(name) > 12 {
+					name = name[:12]
+				}
+				if len(c.Names) > 0 && c.Names[0] != "" {
+					name = strings.TrimPrefix(c.Names[0], "/")
+				}
+				containerByID[c.ID] = frozenContainer{ID: c.ID, Name: name}
+			}
+		}
+	}
+
+	running := make([]frozenContainer, 0, len(containerByID))
+	for _, container := range containerByID {
+		running = append(running, container)
+	}
+
+	sort.Slice(running, func(i, j int) bool {
+		if running[i].Name == running[j].Name {
+			return running[i].ID < running[j].ID
+		}
+		return running[i].Name < running[j].Name
+	})
+
+	if len(running) == 0 {
+		appendLog("No running managed containers to freeze")
+		return nil, nil
+	}
+
+	appendLog(fmt.Sprintf("Freezing %d running managed containers", len(running)))
+	frozen := make([]frozenContainer, 0, len(running))
+	for _, container := range running {
+		if err := s.deploymentService.dockerService.StopContainer(ctx, container.ID); err != nil {
+			_ = s.restartFrozenContainers(ctx, frozen, appendLog)
+			return nil, fmt.Errorf("failed to stop container %s: %w", container.Name, err)
+		}
+		frozen = append(frozen, container)
+		appendLog(fmt.Sprintf("Stopped %s", container.Name))
+	}
+
+	return frozen, nil
+}
+
+func (s *AppService) restartFrozenContainers(ctx context.Context, frozen []frozenContainer, appendLog func(string)) error {
+	if len(frozen) == 0 {
+		return nil
+	}
+
+	appendLog(fmt.Sprintf("Restarting %d frozen containers", len(frozen)))
+	var restartErrs []string
+	for _, container := range frozen {
+		if err := s.deploymentService.dockerService.StartContainer(ctx, container.ID); err != nil {
+			restartErrs = append(restartErrs, fmt.Sprintf("%s: %v", container.Name, err))
+			appendLog(fmt.Sprintf("Failed to restart %s: %v", container.Name, err))
+			continue
+		}
+		appendLog(fmt.Sprintf("Restarted %s", container.Name))
+	}
+
+	if len(restartErrs) > 0 {
+		return fmt.Errorf("one or more containers failed to restart: %s", strings.Join(restartErrs, "; "))
+	}
+
+	return nil
 }
 
 func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App, backup *models.AppBackup, restore *models.AppRestore, restoreAsNew bool, deployFromSnapshot bool, strict bool) {

@@ -79,6 +79,11 @@ func runApps(c *apiClient, args []string) error {
 			return errors.New("usage: apps get <name>")
 		}
 		return c.requestAndPrint(http.MethodGet, "/api/v1/apps/"+url.PathEscape(args[1]), nil)
+	case "containers":
+		if len(args) < 2 {
+			return errors.New("usage: apps containers <name>")
+		}
+		return c.requestAndPrint(http.MethodGet, "/api/v1/apps/"+url.PathEscape(args[1])+"/containers", nil)
 	case "create":
 		body, err := parseJSONFlags("apps create", args[1:])
 		if err != nil {
@@ -434,6 +439,7 @@ func printAppsUsage() {
 	fmt.Println("apps commands:")
 	fmt.Println("  apps list")
 	fmt.Println("  apps get <name>")
+	fmt.Println("  apps containers <name>")
 	fmt.Println("  apps create --json <payload> | --file <path>")
 	fmt.Println("  apps update <name> --json <payload> | --file <path>")
 	fmt.Println("  apps deploy <name>")

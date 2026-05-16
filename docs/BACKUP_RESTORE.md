@@ -42,7 +42,18 @@ For each app backup, atmosphere stores:
 - app SSH deployment key
 
 4. Docker named volumes (`volumes/*.tar.gz`):
-- named volumes attached to containers with label `atmosphere.app=<app-name>`
+- named volumes attached to containers related to the app (matched by app label, compose project name, and app-name prefix)
+
+## Backup Execution Model (Default)
+
+Backups now run in a consistency-first freeze window:
+
+1. Acquire global backup lock (one backup run at a time)
+2. Stop all running app-related containers
+3. Create backup artifacts (metadata, workspace, key, volumes)
+4. Restart the containers that were running before the backup
+
+This greatly improves fresh-machine restore reliability for stateful workloads.
 
 ## Prerequisites
 
@@ -94,6 +105,12 @@ Possible status values:
 
 When complete, `size_bytes`, `log`, and `completed_at` are populated.
 
+Backup log includes freeze/restart lifecycle entries, for example:
+- `Freezing N running managed containers`
+- `Stopped <container-name>`
+- `Restarting N frozen containers`
+- `Restarted <container-name>`
+
 ## List Backups for an App
 
 List recent backups:
@@ -107,6 +124,18 @@ Use optional limit:
 ```bash
 curl "http://localhost:3000/api/v1/apps/my-app/backups?limit=50"
 ```
+
+## Inspect App-Related Containers
+
+Show containers Atmosphere considers related to an app:
+
+```bash
+curl http://localhost:3000/api/v1/apps/my-app/containers
+```
+
+Response fields:
+- `id`, `name`, `image`, `state`, `status`
+- `matched_by`: one or more of `app_label`, `compose_project`, `name_prefix`
 
 ## Restore App from Backup
 
@@ -244,6 +273,12 @@ journalctl -u atmosphere -f
 
 ```bash
 docker info
+```
+
+3. Inspect app-related containers:
+
+```bash
+curl -s http://localhost:3000/api/v1/apps/my-app/containers | jq
 ```
 
 ### Backup stuck in `in_progress`

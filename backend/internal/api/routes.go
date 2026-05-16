@@ -68,6 +68,7 @@ func NewRouter(appService *services.AppService, resetService *services.ResetServ
 
 		// Logs
 		r.Get("/apps/{name}/logs", handler.GetDeploymentLogs)
+		r.Get("/apps/{name}/containers", handler.ListAppContainers)
 
 		// App backups and restores
 		r.Post("/apps/{name}/backups", handler.CreateAppBackup)

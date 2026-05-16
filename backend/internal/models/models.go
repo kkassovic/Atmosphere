@@ -141,6 +141,16 @@ type FileInfo struct {
 	IsDir   bool      `json:"is_dir"`
 }
 
+// AppContainer describes one container related to an app and how it was matched.
+type AppContainer struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Image     string   `json:"image"`
+	State     string   `json:"state"`
+	Status    string   `json:"status"`
+	MatchedBy []string `json:"matched_by"`
+}
+
 // AppBackup represents a single app backup run
 type AppBackup struct {
 	ID              int64      `json:"id"`

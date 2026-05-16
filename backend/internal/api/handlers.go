@@ -173,6 +173,23 @@ func (h *Handler) GetDeploymentLogs(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, logs)
 }
 
+// ListAppContainers handles GET /api/v1/apps/{name}/containers
+func (h *Handler) ListAppContainers(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	containers, err := h.appService.ListAppContainers(name)
+	if err != nil {
+		if err.Error() == "app not found" {
+			respondError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, containers)
+}
+
 // CreateAppBackup handles POST /api/v1/apps/{name}/backups
 func (h *Handler) CreateAppBackup(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")

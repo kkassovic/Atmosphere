@@ -112,6 +112,13 @@ atmosphere-cli apps get openp
 curl -s http://localhost:3000/api/v1/apps/openp | jq
 ```
 
+## App Containers (Relation Debug)
+
+```bash
+atmosphere-cli apps containers openp
+curl -s http://localhost:3000/api/v1/apps/openp/containers | jq
+```
+
 ---
 
 ## Deploy
@@ -184,6 +191,9 @@ atmosphere-cli backups get openp openp-1778692456
 # Delete a specific backup
 atmosphere-cli backups delete openp openp-1778692456
 ```
+
+Default backup behavior:
+- Atmosphere stops running app-related containers, creates the backup, then restarts those containers.
 
 ---
 
