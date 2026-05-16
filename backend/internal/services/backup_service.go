@@ -685,13 +685,12 @@ func (s *AppService) runAppRestore(sourceApp *models.App, targetApp *models.App,
 				s.finishRestoreWithError(restore, &logBuilder, fmt.Errorf("failed to restore volume %s: %w", targetVolumeName, err))
 				return
 			}
-			// After restoring the volume, align ownership inside the mount with the Atmosphere process user.
-			if mountPath, err := s.deploymentService.dockerService.GetVolumeMountpoint(ctx, targetVolumeName); err == nil {
-				if uid, gid, ok := getEffectiveOwnership(); ok {
-					_ = recursiveChown(mountPath, uid, gid)
-				}
-			}
-			appendLog(fmt.Sprintf("Restored volume %s (source %s) and normalized ownership", targetVolumeName, sourceVolumeName))
+			// Do NOT recursiveChown volume data. The tar archive preserves the exact
+			// UID/GID of files as they were inside the container (e.g. postgres=999,
+			// openproject=1000). Forcing Atmosphere's process UID on volume data
+			// breaks container databases that refuse to start if their data directory
+			// is not owned by the expected internal user.
+			appendLog(fmt.Sprintf("Restored volume %s (source %s)", targetVolumeName, sourceVolumeName))
 		}
 	}
 
