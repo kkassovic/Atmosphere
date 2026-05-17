@@ -119,6 +119,7 @@ mkdir -p $INSTALL_DIR
 mkdir -p $INSTALL_DIR/workspaces
 mkdir -p $INSTALL_DIR/keys
 mkdir -p $INSTALL_DIR/logs
+mkdir -p $INSTALL_DIR/templates/apps
 mkdir -p $TRAEFIK_DIR
 mkdir -p $TRAEFIK_DIR/acme
 
@@ -140,6 +141,7 @@ DATABASE_PATH=/opt/atmosphere/atmosphere.db
 WORKSPACES_DIR=/opt/atmosphere/workspaces
 KEYS_DIR=/opt/atmosphere/keys
 LOGS_DIR=/opt/atmosphere/logs
+TEMPLATES_DIR=/opt/atmosphere/templates/apps
 DOCKER_NETWORK=atmosphere
 TRAEFIK_NETWORK=traefik
 LETSENCRYPT_EMAIL=admin@example.com
@@ -149,6 +151,18 @@ EOF
     echo -e "${YELLOW}⚠ Please edit $INSTALL_DIR/.env and set LETSENCRYPT_EMAIL${NC}"
 else
     echo -e "${GREEN}✓ Configuration already exists${NC}"
+fi
+
+# Sync built-in app templates to runtime directory
+TEMPLATES_SOURCE_DIR="$PROJECT_ROOT/templates/apps"
+TEMPLATES_TARGET_DIR="$INSTALL_DIR/templates/apps"
+if [ -d "$TEMPLATES_SOURCE_DIR" ]; then
+  echo -e "${YELLOW}Syncing built-in app templates...${NC}"
+  mkdir -p "$TEMPLATES_TARGET_DIR"
+  cp -a "$TEMPLATES_SOURCE_DIR"/. "$TEMPLATES_TARGET_DIR"/
+  echo -e "${GREEN}✓ Templates synced to $TEMPLATES_TARGET_DIR${NC}"
+else
+  echo -e "${YELLOW}⚠ Templates source not found at $TEMPLATES_SOURCE_DIR${NC}"
 fi
 
 # Set up Traefik

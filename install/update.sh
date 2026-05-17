@@ -80,6 +80,17 @@ CGO_ENABLED=1 go build -o "$INSTALL_DIR/atmosphere-cli" ./cmd/atmosphere-cli
 chmod +x "$INSTALL_DIR/atmosphere" "$INSTALL_DIR/atmosphere-cli"
 ln -sf "$INSTALL_DIR/atmosphere-cli" /usr/local/bin/atmosphere-cli
 
+echo -e "${YELLOW}Syncing built-in app templates...${NC}"
+TEMPLATES_SOURCE_DIR="$PROJECT_ROOT/templates/apps"
+TEMPLATES_TARGET_DIR="$INSTALL_DIR/templates/apps"
+if [ -d "$TEMPLATES_SOURCE_DIR" ]; then
+  mkdir -p "$TEMPLATES_TARGET_DIR"
+  cp -a "$TEMPLATES_SOURCE_DIR"/. "$TEMPLATES_TARGET_DIR"/
+  echo -e "${GREEN}✓ Templates synced to $TEMPLATES_TARGET_DIR${NC}"
+else
+  echo -e "${YELLOW}⚠ Templates source not found at $TEMPLATES_SOURCE_DIR${NC}"
+fi
+
 echo -e "${YELLOW}Restarting atmosphere service...${NC}"
 systemctl restart atmosphere
 

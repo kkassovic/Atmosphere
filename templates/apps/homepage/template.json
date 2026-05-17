@@ -32,7 +32,8 @@
   "default_env": {
     "TZ": "{{tz}}",
     "PUID": "{{puid}}",
-    "PGID": "{{pgid}}"
+    "PGID": "{{pgid}}",
+    "HOMEPAGE_ALLOWED_HOSTS": "{{domains_csv}}"
   },
   "metadata": {
     "category": "dashboard",
