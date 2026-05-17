@@ -1,0 +1,40 @@
+services:
+  netdata:
+    image: netdata/netdata:stable
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.entrypoints=websecure"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.tls=true"
+      - "traefik.http.routers.${ATMOSPHERE_APP}.tls.certresolver=letsencrypt"
+      - "traefik.http.services.${ATMOSPHERE_APP}.loadbalancer.server.port=19999"
+    environment:
+      TZ: ${TZ:-UTC}
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdata_config:/etc/netdata
+      - netdata_lib:/var/lib/netdata
+      - netdata_cache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+    networks:
+      - default
+      - traefik
+
+volumes:
+  netdata_config:
+  netdata_lib:
+  netdata_cache:
+
+networks:
+  default:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}

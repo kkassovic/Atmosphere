@@ -82,3 +82,5 @@ If a placeholder value is missing, provisioning fails with a validation error.
 - `uptime-kuma`
 - `vaultwarden`
 - `superset`
+- `netdata`
+- `home-page`

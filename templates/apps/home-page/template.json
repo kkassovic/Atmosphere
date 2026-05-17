@@ -1,0 +1,41 @@
+{
+  "id": "home-page",
+  "name": "Home Page",
+  "description": "Modern, fully static, fast dashboard for your services",
+  "deployment_type": "manual",
+  "build_type": "compose",
+  "compose_path": "docker-compose.yml",
+  "port": 3000,
+  "inputs": [
+    {
+      "name": "tz",
+      "label": "Timezone",
+      "type": "string",
+      "required": false,
+      "default": "UTC"
+    },
+    {
+      "name": "puid",
+      "label": "PUID",
+      "type": "string",
+      "required": false,
+      "default": "1000"
+    },
+    {
+      "name": "pgid",
+      "label": "PGID",
+      "type": "string",
+      "required": false,
+      "default": "1000"
+    }
+  ],
+  "default_env": {
+    "TZ": "{{tz}}",
+    "PUID": "{{puid}}",
+    "PGID": "{{pgid}}"
+  },
+  "metadata": {
+    "category": "dashboard",
+    "sample_provision_curl": "curl -X POST http://localhost:3000/api/v1/templates/home-page/provision -H \"Content-Type: application/json\" -d '{\"app_name\":\"my-home-page\",\"domains\":[\"home.example.com\"],\"inputs\":{\"tz\":\"UTC\",\"puid\":\"1000\",\"pgid\":\"1000\"},\"env_vars\":{},\"auto_deploy\":true}'"
+  }
+}
